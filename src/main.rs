@@ -1,0 +1,85 @@
+mod claude;
+mod commands;
+mod config;
+mod git;
+mod lock;
+mod prompt;
+mod td;
+mod vcs;
+
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+use tracing::error;
+
+#[derive(Parser)]
+#[command(
+    name = "nocturnal",
+    about = "Automated task orchestrator for Claude Code + td"
+)]
+struct Cli {
+    /// Override project root (default: current directory)
+    #[arg(long = "project", global = true)]
+    project: Option<String>,
+
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Pick next task: proposal-review, review, or implement [default]
+    Run,
+    /// Pick and implement the highest-priority open task
+    Implement,
+    /// Pick and review the next reviewable task
+    Review,
+    /// Check open proposals for review comments and address them
+    ProposalReview,
+    /// Process one project per tick, cycling through the project list
+    Rotate,
+    /// Run 'run' for every project in the project list (same tick)
+    Foreach,
+}
+
+fn main() {
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
+    let cli = Cli::parse();
+
+    if let Err(e) = run(cli) {
+        error!("{e:#}");
+        std::process::exit(1);
+    }
+}
+
+fn run(cli: Cli) -> Result<()> {
+    let cfg = config::Config::from_env();
+    let command = cli.command.unwrap_or(Command::Run);
+
+    match command {
+        Command::Rotate => commands::rotate::run(&cfg),
+        Command::Foreach => commands::foreach::run(&cfg),
+        _ => {
+            let project_root = match cli.project {
+                Some(p) => p,
+                None => std::env::current_dir()?.display().to_string(),
+            };
+            config::check_td_init(&project_root)?;
+
+            let ctx = config::ProjectContext::new(cfg, project_root);
+            match command {
+                Command::Run => commands::run::run(&ctx),
+                Command::Implement => commands::implement::run(&ctx),
+                Command::Review => commands::review::run(&ctx),
+                Command::ProposalReview => commands::proposal_review::run(&ctx),
+                Command::Rotate | Command::Foreach => unreachable!(),
+            }
+        }
+    }
+}

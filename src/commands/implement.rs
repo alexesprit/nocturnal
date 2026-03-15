@@ -1,0 +1,65 @@
+use anyhow::Result;
+use tracing::{error, info};
+
+use crate::config::ProjectContext;
+use crate::{claude, git, lock, prompt, td};
+
+pub fn run(ctx: &ProjectContext) -> Result<()> {
+    let slug = ctx.project_slug();
+    let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("implement-{slug}"))?;
+
+    run_unlocked(ctx)
+}
+
+pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
+    let td = td::Td::new(&ctx.project_root);
+
+    let task_id = td
+        .get_next_task_id()?
+        .ok_or_else(|| anyhow::anyhow!("No open tasks found"))?;
+
+    info!("=== Implementing task: {task_id} ===");
+
+    let task = td.show(&task_id)?;
+    let review_count = td::get_review_count(&task);
+    if review_count >= ctx.cfg.max_reviews {
+        info!(
+            "Task {task_id} has {review_count} review cycles (max {}), skipping",
+            ctx.cfg.max_reviews
+        );
+        return Ok(());
+    }
+
+    let wt_path = git::ensure_worktree(&ctx.project_root, &task_id)?;
+    info!("Worktree: {wt_path}");
+
+    td.start(&task_id).ok();
+
+    let rendered = prompt::render(
+        prompt::Template::Implement,
+        &task_id,
+        &ctx.project_root,
+        ctx.cfg.max_reviews,
+    );
+
+    let log_file = format!(
+        "{}/implement-{}-{}.log",
+        ctx.cfg.log_dir,
+        task_id,
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    );
+
+    if claude::run(ctx, &wt_path, &rendered, &log_file)? {
+        info!("Implementation completed");
+        td.review(&task_id).ok();
+        info!("Task {task_id} submitted for review");
+    } else {
+        error!("Implementation failed (exit code nonzero)");
+        td.log(&format!(
+            "Orchestrator: implementation failed — see {log_file}"
+        ))
+        .ok();
+    }
+
+    Ok(())
+}
