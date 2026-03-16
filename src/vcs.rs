@@ -163,6 +163,10 @@ pub fn get_proposal_state(
                 .current_dir(wt_path)
                 .output()
                 .context("Failed to view GitLab MR")?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                bail!("Failed to view GitLab MR #{proposal_id}: {}", stderr.trim());
+            }
             let json: serde_json::Value =
                 serde_json::from_slice(&output.stdout).context("Failed to parse MR JSON")?;
             json["state"].as_str().unwrap_or("unknown").to_string()
@@ -173,6 +177,10 @@ pub fn get_proposal_state(
                 .current_dir(wt_path)
                 .output()
                 .context("Failed to view GitHub PR")?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                bail!("Failed to view GitHub PR #{proposal_id}: {}", stderr.trim());
+            }
             let json: serde_json::Value =
                 serde_json::from_slice(&output.stdout).context("Failed to parse PR JSON")?;
             json["state"].as_str().unwrap_or("unknown").to_string()
