@@ -17,17 +17,16 @@ pub fn run(cfg: &Config) -> Result<()> {
 
     let count = projects.len();
 
-    let last_idx: i64 = fs::read_to_string(&cfg.rotation_state_file)
+    let last_idx: Option<usize> = fs::read_to_string(&cfg.rotation_state_file)
         .ok()
-        .and_then(|s| s.trim().parse().ok())
-        .unwrap_or(-1);
+        .and_then(|s| s.trim().parse().ok());
 
     if let Some(parent) = std::path::Path::new(&cfg.rotation_state_file).parent() {
         fs::create_dir_all(parent).ok();
     }
 
     let mut tried = 0;
-    let mut idx = ((last_idx + 1) % count as i64) as usize;
+    let mut idx = last_idx.map_or(0, |i| (i + 1) % count);
 
     while tried < count {
         let project_root = &projects[idx];
