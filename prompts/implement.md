@@ -50,12 +50,12 @@ If there are prior commits, review them to understand what was already done. Bui
 
 ### 4. Validate
 
-Run available validation commands (adapt to the project):
-- Type checking (e.g., `tsc --noEmit`, `mypy`)
-- Linting (e.g., `eslint`, `ruff`)
-- Tests (e.g., `npm test`, `pytest`)
+Check the project's `CLAUDE.md` for validation commands (build, lint, typecheck, test). If `CLAUDE.md` does not specify commands, look for `Makefile`, `package.json` scripts, or framework conventions.
 
-Fix any issues found.
+Run all available validation commands. Fix any issues your changes introduced. If validation fails on pre-existing issues unrelated to your changes, log the blocker and proceed:
+```bash
+td log --blocker "Pre-existing failure: <description>" -w "{{PROJECT_ROOT}}"
+```
 
 ### 5. Commit
 

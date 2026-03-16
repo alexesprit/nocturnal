@@ -32,7 +32,7 @@ The unresolved review comments are appended below. For each comment:
 
 ## After Fixing
 
-1. Run the project's test suite to verify your changes do not break anything. If tests fail due to your changes, fix them before proceeding.
+1. Run the project's validation commands (check `CLAUDE.md` for build, lint, typecheck, test instructions). Fix any issues your changes introduced before proceeding.
 
 2. Amend the last commit with your fixes and force-push:
 ```bash

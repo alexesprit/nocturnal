@@ -61,7 +61,11 @@ Evaluate the changes against these criteria:
 - Were relevant tests added or updated?
 - Do existing tests still pass?
 
-### 3. Make Your Decision
+### 3. Run Validation
+
+Run the project's validation commands (check `CLAUDE.md` for build, lint, typecheck, test instructions). Report any failures introduced by the changes as rejection reasons.
+
+### 4. Make Your Decision
 
 **Approve** if the implementation is correct, follows conventions, and meets acceptance criteria:
 ```bash
