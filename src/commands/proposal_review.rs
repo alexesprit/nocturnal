@@ -94,9 +94,18 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
             "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"
         ));
 
+        let slug = ctx.project_slug();
         let log_file = claude::log_path(&ctx.cfg.log_dir, "proposal-review", &task_id);
 
-        if claude::run(ctx, &wt_path, &rendered, &log_file)? {
+        if claude::run(
+            ctx,
+            &wt_path,
+            &rendered,
+            &log_file,
+            "proposal-review",
+            &slug,
+            &task_id,
+        )? {
             info!("Proposal review completed");
         } else {
             error!("Proposal review failed");

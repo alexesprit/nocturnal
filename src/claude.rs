@@ -1,9 +1,11 @@
 use std::fs;
 use std::process::Command;
+use std::time::Instant;
 
 use anyhow::{Context, Result};
 use tracing::info;
 
+use crate::activity;
 use crate::config::ProjectContext;
 
 pub fn log_path(log_dir: &str, command: &str, task_id: &str) -> String {
@@ -39,7 +41,15 @@ mod tests {
     }
 }
 
-pub fn run(ctx: &ProjectContext, wt_path: &str, prompt: &str, log_file: &str) -> Result<bool> {
+pub fn run(
+    ctx: &ProjectContext,
+    wt_path: &str,
+    prompt: &str,
+    log_file: &str,
+    command_name: &str,
+    project: &str,
+    task_id: &str,
+) -> Result<bool> {
     fs::create_dir_all(&ctx.cfg.log_dir).ok();
 
     info!(
@@ -47,6 +57,9 @@ pub fn run(ctx: &ProjectContext, wt_path: &str, prompt: &str, log_file: &str) ->
         ctx.cfg.model, ctx.cfg.max_budget
     );
     info!("Log: {log_file}");
+
+    let started_at = chrono::Local::now();
+    let timer = Instant::now();
 
     let output_file = fs::File::create(log_file).context("Failed to create log file")?;
     let stderr_file = output_file.try_clone()?;
@@ -67,5 +80,22 @@ pub fn run(ctx: &ProjectContext, wt_path: &str, prompt: &str, log_file: &str) ->
         .status()
         .context("Failed to run claude")?;
 
-    Ok(status.success())
+    let elapsed = timer.elapsed();
+    let finished_at = chrono::Local::now();
+    let success = status.success();
+
+    activity::record(
+        &ctx.cfg.log_dir,
+        &activity::Entry {
+            command: command_name.to_string(),
+            project: project.to_string(),
+            task_id: task_id.to_string(),
+            started_at: started_at.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            finished_at: finished_at.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            duration_secs: elapsed.as_secs(),
+            success,
+        },
+    );
+
+    Ok(success)
 }

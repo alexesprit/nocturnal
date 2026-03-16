@@ -341,11 +341,6 @@ fn is_process_alive(pid: u32) -> bool {
         .is_ok_and(|s| s.success())
 }
 
-fn format_system_time(t: std::time::SystemTime) -> String {
-    let dt: chrono::DateTime<chrono::Local> = t.into();
-    dt.format("%b %-d, %Y %H:%M").to_string()
-}
-
 fn fetch_orchestrator_status(
     rotation_state_file: &str,
     log_dir: &str,
@@ -353,7 +348,16 @@ fn fetch_orchestrator_status(
 ) -> OrchestratorStatus {
     let (current_project, next_project) = read_rotation_state(rotation_state_file, projects);
 
-    let recent_logs = scan_recent_logs(log_dir, 5);
+    let recent_logs = crate::activity::read_recent(log_dir, 5)
+        .into_iter()
+        .map(|e| RecentLogEntry {
+            command: e.command,
+            project: e.project,
+            task_id: e.task_id,
+            started: format_iso_datetime(&e.started_at),
+            duration: format_duration_secs(e.duration_secs),
+        })
+        .collect();
 
     OrchestratorStatus {
         current_project,
@@ -385,120 +389,13 @@ fn read_rotation_state(
     }
 }
 
-fn scan_recent_logs(log_dir: &str, limit: usize) -> Vec<RecentLogEntry> {
-    let dir = match std::fs::read_dir(log_dir) {
-        Ok(d) => d,
-        Err(_) => return Vec::new(),
-    };
-
-    let mut entries: Vec<(std::time::SystemTime, RecentLogEntry)> = Vec::new();
-
-    for entry in dir.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy().to_string();
-
-        if !name_str.ends_with(".log") {
-            continue;
-        }
-
-        let stem = &name_str[..name_str.len() - 4];
-
-        // Actual format: <command>-<task-id>-<YYYYMMDD-HHMMSS>
-        // where command = "implement", "review", or "proposal-review"
-        // and task-id can contain hyphens (e.g. "td-8f756d")
-        // Timestamp is always YYYYMMDD-HHMMSS (15 chars with the dash)
-        //
-        // Parse from the right: last 15 chars = timestamp, then find command prefix
-        if stem.len() < 17 {
-            // minimum: "x-y-YYYYMMDD-HHMMSS"
-            continue;
-        }
-
-        // Timestamp is the last 15 chars (YYYYMMDD-HHMMSS)
-        let ts_start = stem.len() - 15;
-        // There should be a '-' before the timestamp
-        if ts_start == 0 || stem.as_bytes()[ts_start - 1] != b'-' {
-            continue;
-        }
-
-        let timestamp_str = &stem[ts_start..];
-        let prefix = &stem[..ts_start - 1]; // everything before the timestamp dash
-
-        // prefix = "<command>-<task-id>"
-        // Known commands: "implement", "review", "proposal-review"
-        let (command, task_id) = if let Some(rest) = prefix.strip_prefix("proposal-review-") {
-            ("proposal-review", rest)
-        } else if let Some(rest) = prefix.strip_prefix("implement-") {
-            ("implement", rest)
-        } else if let Some(rest) = prefix.strip_prefix("review-") {
-            ("review", rest)
-        } else {
-            continue;
-        };
-
-        let meta = match entry.metadata() {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
-
-        let mtime = match meta.modified() {
-            Ok(t) => t,
-            Err(_) => continue,
-        };
-
-        let started =
-            format_timestamp_str(timestamp_str).unwrap_or_else(|| format_system_time(mtime));
-
-        // Compute duration from filename timestamp to mtime (file last written = end time)
-        let duration_str = parse_timestamp_as_system_time(timestamp_str)
-            .and_then(|start| mtime.duration_since(start).ok())
-            .map(format_duration)
-            .unwrap_or_default();
-
-        entries.push((
-            mtime,
-            RecentLogEntry {
-                command: command.to_string(),
-                task_id: task_id.to_string(),
-                started,
-                duration: duration_str,
-            },
-        ));
-    }
-
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
-    entries.truncate(limit);
-    entries.into_iter().map(|(_, e)| e).collect()
+fn format_iso_datetime(s: &str) -> String {
+    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+        .map(|dt| dt.format("%b %-d, %Y %H:%M").to_string())
+        .unwrap_or_else(|_| s.to_string())
 }
 
-fn format_timestamp_str(ts: &str) -> Option<String> {
-    // Try to parse YYYYMMDD-HHMMSS format (15 chars with dash)
-    if ts.len() == 15 && ts.as_bytes()[8] == b'-' {
-        let dt = chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d-%H%M%S").ok()?;
-        return Some(dt.format("%b %-d, %Y %H:%M").to_string());
-    }
-    // Fallback: try YYYYMMDDHHMMSS (14 chars, no dash)
-    if ts.len() == 14 {
-        let dt = chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d%H%M%S").ok()?;
-        return Some(dt.format("%b %-d, %Y %H:%M").to_string());
-    }
-    None
-}
-
-fn parse_timestamp_as_system_time(ts: &str) -> Option<std::time::SystemTime> {
-    let naive = if ts.len() == 15 && ts.as_bytes()[8] == b'-' {
-        chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d-%H%M%S").ok()?
-    } else if ts.len() == 14 {
-        chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d%H%M%S").ok()?
-    } else {
-        return None;
-    };
-    let local = naive.and_local_timezone(chrono::Local).single()?;
-    Some(local.into())
-}
-
-fn format_duration(d: std::time::Duration) -> String {
-    let secs = d.as_secs();
+fn format_duration_secs(secs: u64) -> String {
     if secs < 60 {
         format!("{secs}s")
     } else if secs < 3600 {

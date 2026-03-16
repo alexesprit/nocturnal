@@ -60,9 +60,12 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         Some(review_cycle),
     );
 
+    let slug = ctx.project_slug();
     let log_file = claude::log_path(&ctx.cfg.log_dir, "review", &task_id);
 
-    if !claude::run(ctx, &wt_path, &rendered, &log_file)? {
+    if !claude::run(
+        ctx, &wt_path, &rendered, &log_file, "review", &slug, &task_id,
+    )? {
         error!("Review failed (exit code nonzero)");
         return Ok(());
     }

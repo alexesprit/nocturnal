@@ -1,3 +1,4 @@
+mod activity;
 mod claude;
 mod commands;
 mod config;

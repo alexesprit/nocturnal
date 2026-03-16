@@ -42,9 +42,18 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         ctx.cfg.max_reviews,
     );
 
+    let slug = ctx.project_slug();
     let log_file = claude::log_path(&ctx.cfg.log_dir, "implement", &task_id);
 
-    if claude::run(ctx, &wt_path, &rendered, &log_file)? {
+    if claude::run(
+        ctx,
+        &wt_path,
+        &rendered,
+        &log_file,
+        "implement",
+        &slug,
+        &task_id,
+    )? {
         info!("Implementation completed");
         td.review(&task_id).ok();
         info!("Task {task_id} submitted for review");

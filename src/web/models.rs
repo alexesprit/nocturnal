@@ -148,6 +148,7 @@ pub struct OrchestratorStatus {
 
 pub struct RecentLogEntry {
     pub command: String,
+    pub project: String,
     pub task_id: String,
     pub started: String,
     pub duration: String,
