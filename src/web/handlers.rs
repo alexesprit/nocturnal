@@ -9,8 +9,8 @@ use tracing::{error, warn};
 
 use super::AppState;
 use super::models::{
-    IssueDetail, ListOpts, LockStatus, NocBadge, NocIssueState, NocProjectStatus, NocTaskCounts,
-    OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
+    IssueDetail, ListOpts, LockStatus, NextTask, NocBadge, NocIssueState, NocProjectStatus,
+    NocTaskCounts, OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
 };
 use crate::config;
 use crate::td::Task;
@@ -168,7 +168,13 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
         }
     }
 
-    let orchestrator = fetch_orchestrator_status(&rotation_state_file, &log_dir, &project_paths);
+    let td_binary_for_orch = state.td_binary.clone();
+    let orchestrator = fetch_orchestrator_status(
+        &rotation_state_file,
+        &log_dir,
+        &project_paths,
+        &td_binary_for_orch,
+    );
 
     let tmpl = DashboardTemplate {
         title: "Dashboard".to_string(),
@@ -345,8 +351,17 @@ fn fetch_orchestrator_status(
     rotation_state_file: &str,
     log_dir: &str,
     projects: &[(String, String)],
+    td_binary: &str,
 ) -> OrchestratorStatus {
     let (current_project, next_project) = read_rotation_state(rotation_state_file, projects);
+
+    let next_task = next_project.as_ref().and_then(|name| {
+        let path = projects
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, p)| p.as_str())?;
+        fetch_next_task(td_binary, path)
+    });
 
     let recent_logs = crate::activity::read_recent(log_dir, 5)
         .into_iter()
@@ -362,8 +377,26 @@ fn fetch_orchestrator_status(
     OrchestratorStatus {
         current_project,
         next_project,
+        next_task,
         recent_logs,
     }
+}
+
+fn fetch_next_task(td_binary: &str, project_path: &str) -> Option<NextTask> {
+    let td = crate::td::Td::new(project_path);
+    let vcs_mode = crate::project_config::load_vcs_mode(project_path);
+    let check_proposals = crate::vcs::detect_platform(project_path, vcs_mode).is_some();
+    let action = td.get_next_action(check_proposals).ok()?;
+
+    let task_id = action.task_id()?;
+    let action_label = action.label().to_string();
+    let detail = run_td_show(td_binary, project_path, task_id).ok()?;
+    Some(NextTask {
+        action: action_label,
+        id: detail.id,
+        title: detail.title,
+        priority: detail.priority,
+    })
 }
 
 fn read_rotation_state(

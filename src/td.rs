@@ -109,6 +109,27 @@ impl<'a> Td<'a> {
             .collect())
     }
 
+    /// Determine the next action the orchestrator would take.
+    /// `check_proposals` should be true when VCS integration is active.
+    pub fn get_next_action(&self, check_proposals: bool) -> Result<NextAction> {
+        if check_proposals {
+            let proposals = self.get_proposal_task_ids()?;
+            if !proposals.is_empty() {
+                return Ok(NextAction::ProposalReview(proposals));
+            }
+        }
+
+        if let Some(task_id) = self.get_reviewable_task_id()? {
+            return Ok(NextAction::Review(task_id));
+        }
+
+        if let Some(task_id) = self.get_next_task_id()? {
+            return Ok(NextAction::Implement(task_id));
+        }
+
+        Ok(NextAction::Idle)
+    }
+
     pub fn start(&self, task_id: &str) -> Result<()> {
         self.run_quiet(&["start", task_id])
     }
@@ -141,6 +162,32 @@ impl<'a> Td<'a> {
     pub fn update_labels(&self, task_id: &str, labels: &str) -> Result<()> {
         self.run(&["update", task_id, "--labels", labels])?;
         Ok(())
+    }
+}
+
+pub enum NextAction {
+    ProposalReview(Vec<String>),
+    Review(String),
+    Implement(String),
+    Idle,
+}
+
+impl NextAction {
+    pub fn task_id(&self) -> Option<&str> {
+        match self {
+            NextAction::ProposalReview(ids) => ids.first().map(|s| s.as_str()),
+            NextAction::Review(id) | NextAction::Implement(id) => Some(id),
+            NextAction::Idle => None,
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            NextAction::ProposalReview(_) => "Proposal Review",
+            NextAction::Review(_) => "Review",
+            NextAction::Implement(_) => "Implement",
+            NextAction::Idle => "Idle",
+        }
     }
 }
 

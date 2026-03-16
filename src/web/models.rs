@@ -143,7 +143,15 @@ pub struct NocIssueState {
 pub struct OrchestratorStatus {
     pub current_project: Option<String>,
     pub next_project: Option<String>,
+    pub next_task: Option<NextTask>,
     pub recent_logs: Vec<RecentLogEntry>,
+}
+
+pub struct NextTask {
+    pub action: String,
+    pub id: String,
+    pub title: String,
+    pub priority: String,
 }
 
 pub struct RecentLogEntry {

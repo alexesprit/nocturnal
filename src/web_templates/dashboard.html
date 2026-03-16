@@ -8,6 +8,8 @@
         <dd>{% if let Some(current) = orchestrator.current_project %}<a href="/projects/{{ current }}">{{ current }}</a>{% else %}-{% endif %}</dd>
         <dt>Next Project</dt>
         <dd>{% if let Some(next) = orchestrator.next_project %}<a href="/projects/{{ next }}">{{ next }}</a>{% else %}-{% endif %}</dd>
+        <dt>Next Action</dt>
+        <dd class="next-task-dd">{% if let Some(task) = orchestrator.next_task %}{{ task.action }}: <a href="/projects/{{ orchestrator.next_project.as_ref().unwrap() }}/issues/{{ task.id }}"><code>{{ task.id }}</code></a> <span class="next-task-title">{{ task.title }}</span>{% if !task.priority.is_empty() %} <span class="badge badge-priority badge-priority-{{ task.priority }}">{{ task.priority }}</span>{% endif %}{% else %}-{% endif %}</dd>
     </dl>
     {% if !orchestrator.recent_logs.is_empty() %}
     <h3>Recent Activity</h3>
