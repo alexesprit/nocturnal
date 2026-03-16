@@ -16,3 +16,6 @@ build:
 
 install:
     cargo install --path .
+
+web:
+    cargo watch -c -x 'run -- web'
