@@ -14,101 +14,104 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
 pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
     let td_client = td::Td::new(&ctx.project_root);
 
-    let task_id = match td_client.get_proposal_task_id()? {
-        Some(id) => id,
-        None => {
-            info!("No tasks with open proposals");
-            return Ok(());
-        }
-    };
-
-    info!("=== Checking proposal for task: {task_id} ===");
+    let task_ids = td_client.get_proposal_task_ids()?;
+    if task_ids.is_empty() {
+        info!("No tasks with open proposals");
+        return Ok(());
+    }
 
     let platform = vcs::detect_platform(&ctx.project_root, &ctx.cfg.vcs_platform_override)
         .ok_or_else(|| anyhow::anyhow!("No VCS platform detected"))?;
 
-    let task = td_client.show(&task_id)?;
-    let proposal_id = task
-        .labels
-        .iter()
-        .find_map(|l| l.strip_prefix("noc-proposal:"))
-        .ok_or_else(|| anyhow::anyhow!("Could not extract proposal ID for {task_id}"))?
-        .to_string();
+    for task_id in task_ids {
+        info!("=== Checking proposal for task: {task_id} ===");
 
-    let wt_path = git::worktree_path(&ctx.project_root, &task_id)?
-        .ok_or_else(|| anyhow::anyhow!("No worktree found for {task_id}"))?;
+        let task = td_client.show(&task_id)?;
+        let proposal_id = task
+            .labels
+            .iter()
+            .find_map(|l| l.strip_prefix("noc-proposal:"))
+            .ok_or_else(|| anyhow::anyhow!("Could not extract proposal ID for {task_id}"))?
+            .to_string();
 
-    let state = vcs::get_proposal_state(platform, &wt_path, &proposal_id)?;
+        let wt_path = git::worktree_path(&ctx.project_root, &task_id)?
+            .ok_or_else(|| anyhow::anyhow!("No worktree found for {task_id}"))?;
 
-    match state {
-        vcs::ProposalState::Merged => {
-            info!("Proposal #{proposal_id} merged — approving task");
-            td_client.approve(&task_id)?;
-            let labels = td::swap_label(&task, "noc-proposal:", None);
-            td_client.update_labels(&task_id, &labels)?;
-            return Ok(());
+        let state = vcs::get_proposal_state(platform, &wt_path, &proposal_id)?;
+
+        match state {
+            vcs::ProposalState::Merged => {
+                info!("Proposal #{proposal_id} merged — approving task");
+                td_client.approve(&task_id)?;
+                let labels = td::swap_label(&task, "noc-proposal:", None);
+                td_client.update_labels(&task_id, &labels)?;
+                continue;
+            }
+            vcs::ProposalState::Closed => {
+                info!("Proposal #{proposal_id} closed without merge — rejecting task");
+                let review_count = td::get_review_count(&task);
+                let new_count = review_count + 1;
+                let mut labels: Vec<String> = task
+                    .labels
+                    .iter()
+                    .filter(|l| !l.starts_with("noc-proposal:") && !l.starts_with("noc-reviews:"))
+                    .cloned()
+                    .collect();
+                labels.push(format!("noc-reviews:{new_count}"));
+                td_client.update_labels(&task_id, &labels.join(","))?;
+                td_client
+                    .reject(&task_id, "Proposal closed without merging")
+                    .ok();
+                continue;
+            }
+            vcs::ProposalState::Open => {}
         }
-        vcs::ProposalState::Closed => {
-            info!("Proposal #{proposal_id} closed without merge — rejecting task");
-            let review_count = td::get_review_count(&task);
-            let new_count = review_count + 1;
-            // Build labels in one pass: remove noc-proposal: and noc-reviews:, add new review count
-            let mut labels: Vec<String> = task
-                .labels
-                .iter()
-                .filter(|l| !l.starts_with("noc-proposal:") && !l.starts_with("noc-reviews:"))
-                .cloned()
-                .collect();
-            labels.push(format!("noc-reviews:{new_count}"));
-            td_client.update_labels(&task_id, &labels.join(","))?;
-            td_client
-                .reject(&task_id, "Proposal closed without merging")
-                .ok();
-            return Ok(());
+
+        // Proposal is open — check for unresolved comments
+        let comments_json = vcs::fetch_unresolved_comments(platform, &wt_path, &proposal_id)?;
+        let comments: Vec<serde_json::Value> =
+            serde_json::from_str(&comments_json).unwrap_or_default();
+
+        if comments.is_empty() {
+            info!("No unresolved comments on proposal #{proposal_id}");
+            continue;
         }
-        vcs::ProposalState::Open => {}
-    }
 
-    // Proposal is open — check for unresolved comments
-    let comments_json = vcs::fetch_unresolved_comments(platform, &wt_path, &proposal_id)?;
-    let comments: Vec<serde_json::Value> = serde_json::from_str(&comments_json).unwrap_or_default();
+        info!(
+            "Found {} unresolved comments — running Claude to address them",
+            comments.len()
+        );
 
-    if comments.is_empty() {
-        info!("No unresolved comments on proposal #{proposal_id}");
+        let vcs_reply_cmd = match platform {
+            vcs::Platform::GitLab => format!("glab mr note {proposal_id} --message"),
+            vcs::Platform::GitHub => format!("gh pr comment {proposal_id} --body"),
+        };
+        let mut rendered = prompt::render_with_vcs(
+            prompt::Template::ProposalReview,
+            &task_id,
+            &ctx.project_root,
+            ctx.cfg.max_reviews,
+            &vcs_reply_cmd,
+        );
+        rendered.push_str(&format!(
+            "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"
+        ));
+
+        let log_file = format!(
+            "{}/proposal-review-{}-{}.log",
+            ctx.cfg.log_dir,
+            task_id,
+            chrono::Local::now().format("%Y%m%d-%H%M%S")
+        );
+
+        if claude::run(ctx, &wt_path, &rendered, &log_file)? {
+            info!("Proposal review completed");
+        } else {
+            error!("Proposal review failed");
+        }
+
+        // Limit to one Claude invocation per tick
         return Ok(());
-    }
-
-    info!(
-        "Found {} unresolved comments — running Claude to address them",
-        comments.len()
-    );
-
-    let vcs_reply_cmd = match platform {
-        vcs::Platform::GitLab => format!("glab mr note {proposal_id} --message"),
-        vcs::Platform::GitHub => format!("gh pr comment {proposal_id} --body"),
-    };
-    let mut rendered = prompt::render_with_vcs(
-        prompt::Template::ProposalReview,
-        &task_id,
-        &ctx.project_root,
-        ctx.cfg.max_reviews,
-        &vcs_reply_cmd,
-    );
-    rendered.push_str(&format!(
-        "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"
-    ));
-
-    let log_file = format!(
-        "{}/proposal-review-{}-{}.log",
-        ctx.cfg.log_dir,
-        task_id,
-        chrono::Local::now().format("%Y%m%d-%H%M%S")
-    );
-
-    if claude::run(ctx, &wt_path, &rendered, &log_file)? {
-        info!("Proposal review completed");
-    } else {
-        error!("Proposal review failed");
     }
 
     Ok(())

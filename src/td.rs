@@ -81,12 +81,13 @@ impl<'a> Td<'a> {
             .map(|t| t.id))
     }
 
-    pub fn get_proposal_task_id(&self) -> Result<Option<String>> {
+    pub fn get_proposal_task_ids(&self) -> Result<Vec<String>> {
         let tasks = self.list_by_status("in_review")?;
         Ok(tasks
             .into_iter()
-            .find(|t| t.labels.iter().any(|l| l.starts_with("noc-proposal:")))
-            .map(|t| t.id))
+            .filter(|t| t.labels.iter().any(|l| l.starts_with("noc-proposal:")))
+            .map(|t| t.id)
+            .collect())
     }
 
     pub fn start(&self, task_id: &str) -> Result<()> {
