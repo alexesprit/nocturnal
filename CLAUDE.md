@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-`nocturnal` is a bash orchestrator that automates task implementation and code review using Claude Code (`claude -p`) and `td` (task management CLI). It runs unattended via launchd/cron.
+`nocturnal` is a Rust CLI that automates task implementation and code review using Claude Code (`claude -p`) and `td` (task management CLI). It runs unattended via launchd/cron.
 
 ## Architecture
 
@@ -19,14 +19,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `td` — task management CLI (github.com/marcus/td), stores data in `.todos/` at project root
 - `git gtr` — git worktree runner (github.com/coderabbitai/git-worktree-runner), creates isolated worktrees
 - `claude` — Claude Code CLI, invoked with `-p` for non-interactive mode
-- `jq` — JSON parsing for td output
 
 ## Prompt Templates
 
-Templates in `prompts/` use `{{PLACEHOLDER}}` syntax, replaced by `sed` at runtime:
+Templates in `prompts/` use `{{PLACEHOLDER}}` syntax, replaced via `String::replace()` in `prompt.rs`:
 - `{{TASK_ID}}` — td task identifier
 - `{{PROJECT_ROOT}}` — absolute path to main repo (for `td -w`)
 - `{{MAX_REVIEWS}}` — max review cycles
+- `{{REVIEW_CYCLE}}` — current review cycle number (review prompt)
+- `{{VCS_REPLY_CMD}}` — platform-specific reply command (proposal-review prompt)
 
 Claude runs `cd`'d into the worktree. All `td` commands in prompts use `-w "{{PROJECT_ROOT}}"` to reach the `.todos/` database in the main repo.
 
@@ -43,10 +44,8 @@ Logs go to `$TMPDIR/nocturnal-logs/`. Check with:
 ls -lt ${TMPDIR}/nocturnal-logs/
 ```
 
-## Shell Conventions
+## Rust Conventions
 
-- `set -euo pipefail` — strict mode
-- No `git -C` — use `(cd "$dir" && git ...)` subshells
-- `readlink -f` for resolving symlinks (requires GNU coreutils on macOS)
-- Atomic locking via `mkdir` (no `flock` on macOS)
-- `$TMPDIR` for temp files, not hardcoded `/tmp`
+- External commands (`td`, `git`, `claude`, `glab`/`gh`) are invoked via `std::process::Command`
+- Atomic locking via `fs::create_dir` (directory-based, similar to `mkdir` atomicity)
+- `$TMPDIR` for temp/log files, not hardcoded `/tmp`

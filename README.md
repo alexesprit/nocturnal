@@ -46,17 +46,12 @@ Tasks that fail review after multiple cycles are blocked for human attention.
 - [td](https://github.com/marcus/td) — task management CLI
 - [git-worktree-runner](https://github.com/coderabbitai/git-worktree-runner) (`git gtr`) — isolated worktree creation
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude`) — AI coding agent
-- [jq](https://jqlang.github.io/jq/) — JSON processing
 - [glab](https://gitlab.com/gitlab-org/cli) (GitLab) or [gh](https://cli.github.com/) (GitHub) — optional, for proposal creation
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/alexesprit/td-orchestrator.git
-
-# Make the script available (symlink or add to PATH)
-ln -s "$(pwd)/td-orchestrator/nocturnal" /usr/local/bin/nocturnal
+cargo install --path .
 ```
 
 The target repository must have `td` initialized (`td init`).
@@ -98,20 +93,55 @@ export NOCTURNAL_PROJECTS=/path/to/project-a:/path/to/project-b
 Then choose a scheduling strategy:
 
 ```bash
-# Round-robin: process one project per invocation (recommended for cron/launchd)
+# Round-robin: process one project per invocation
 nocturnal rotate
 
 # All at once: process every project in a single invocation
 nocturnal foreach
 ```
 
-### Scheduling with launchd
+### Recommended Schedule
+
+Use `rotate` nightly to pick up and implement/review tasks, and `proposal-review` frequently (e.g. every 30 minutes) to address MR/PR comments promptly:
+
+#### cron
+
+```cron
+# Rotate through projects nightly at 2 AM
+0 2 * * * nocturnal rotate
+
+# Check proposals for review comments every 30 minutes
+*/30 * * * * nocturnal --project /path/to/repo proposal-review
+```
+
+#### launchd
+
+Nightly rotation (`~/Library/LaunchAgents/com.nocturnal.rotate.plist`):
 
 ```xml
 <key>ProgramArguments</key>
 <array>
   <string>/path/to/nocturnal</string>
   <string>rotate</string>
+</array>
+<key>StartCalendarInterval</key>
+<dict>
+  <key>Hour</key>
+  <integer>2</integer>
+  <key>Minute</key>
+  <integer>0</integer>
+</dict>
+```
+
+Proposal review every 30 minutes (`~/Library/LaunchAgents/com.nocturnal.proposal-review.plist`):
+
+```xml
+<key>ProgramArguments</key>
+<array>
+  <string>/path/to/nocturnal</string>
+  <string>--project</string>
+  <string>/path/to/repo</string>
+  <string>proposal-review</string>
 </array>
 <key>StartInterval</key>
 <integer>1800</integer>
