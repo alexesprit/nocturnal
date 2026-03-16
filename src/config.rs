@@ -51,7 +51,10 @@ impl Config {
     pub fn from_env() -> Self {
         let tmpdir = env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
 
-        let home = env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+        let home = env::var("HOME").unwrap_or_else(|_| {
+            eprintln!("WARNING: HOME is not set, falling back to /tmp");
+            "/tmp".to_string()
+        });
 
         let vcs_platform_override =
             env::var("NOCTURNAL_VCS_PLATFORM")
