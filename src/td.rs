@@ -99,15 +99,16 @@ impl<'a> Td<'a> {
     }
 
     pub fn approve(&self, task_id: &str) -> Result<()> {
-        self.run_quiet(&["approve", task_id])
+        self.run(&["approve", task_id]).map(|_| ())
     }
 
     pub fn reject(&self, task_id: &str, reason: &str) -> Result<()> {
-        self.run_quiet(&["reject", task_id, "--reason", reason])
+        self.run(&["reject", task_id, "--reason", reason])
+            .map(|_| ())
     }
 
     pub fn block(&self, task_id: &str) -> Result<()> {
-        self.run_quiet(&["block", task_id])
+        self.run(&["block", task_id]).map(|_| ())
     }
 
     pub fn comment(&self, task_id: &str, message: &str) -> Result<()> {
