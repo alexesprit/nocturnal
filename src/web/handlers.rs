@@ -470,7 +470,7 @@ fn run_td_list(td_binary: &str, project_path: &str, opts: &ListOpts) -> anyhow::
     }
 
     let json = String::from_utf8_lossy(&output.stdout);
-    let tasks: Vec<Task> = serde_json::from_str(&json)?;
+    let tasks: Vec<Task> = serde_json::from_str::<Option<Vec<Task>>>(&json)?.unwrap_or_default();
     Ok(tasks)
 }
 
