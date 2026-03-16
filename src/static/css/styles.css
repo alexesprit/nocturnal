@@ -626,12 +626,12 @@ main > section > dl {
 main > section > dl dt {
   color: var(--text-tertiary);
   font-weight: 500;
-  padding: 0.4rem 0;
+  padding: 0.2rem 0;
 }
 
 main > section > dl dd {
   color: var(--text-primary);
-  padding: 0.4rem 0;
+  padding: 0.2rem 0;
   margin: 0;
 }
 
