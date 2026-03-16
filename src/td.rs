@@ -47,7 +47,7 @@ impl<'a> Td<'a> {
             let stderr = String::from_utf8_lossy(&output.stderr);
             bail!("td {} failed: {}", args.join(" "), stderr.trim());
         }
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        String::from_utf8(output.stdout).context("td output was not valid UTF-8")
     }
 
     fn run_quiet(&self, args: &[&str]) -> Result<()> {
