@@ -36,8 +36,6 @@ pub fn run(cfg: &Config) -> Result<()> {
             idx + 1
         );
 
-        fs::write(&cfg.rotation_state_file, idx.to_string()).ok();
-
         if !std::path::Path::new(project_root).join(".todos").is_dir() {
             error!("td not initialized in {project_root} — skipping");
             idx = (idx + 1) % count;
@@ -57,6 +55,8 @@ pub fn run(cfg: &Config) -> Result<()> {
                 continue;
             }
         };
+
+        fs::write(&cfg.rotation_state_file, idx.to_string()).ok();
 
         let ctx = ProjectContext::new(
             Config::from_env(), // fresh config per project
