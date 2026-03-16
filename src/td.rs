@@ -68,9 +68,11 @@ impl<'a> Td<'a> {
     }
 
     pub fn get_next_task_id(&self) -> Result<Option<String>> {
-        let json = self.run(&["list", "--json", "--status", "open", "--limit", "1"])?;
-        let tasks: Vec<Task> = serde_json::from_str(&json).unwrap_or_default();
-        Ok(tasks.into_iter().next().map(|t| t.id))
+        let output = self.run(&["next"]);
+        match output {
+            Ok(stdout) => Ok(stdout.split_whitespace().next().map(|s| s.to_string())),
+            Err(_) => Ok(None),
+        }
     }
 
     pub fn get_reviewable_task_id(&self) -> Result<Option<String>> {
