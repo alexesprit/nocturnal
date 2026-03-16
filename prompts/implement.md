@@ -14,9 +14,13 @@ td session --new "noc-impl-{{TASK_ID}}" -w "{{PROJECT_ROOT}}"
 td show {{TASK_ID}} --long -w "{{PROJECT_ROOT}}"
 ```
 
-3. Verify you are on the correct branch (NOT main):
+3. Verify you are on the correct branch (abort if on main):
 ```bash
-git branch --show-current
+current=$(git branch --show-current)
+if [ "$current" = "main" ] || [ "$current" = "master" ]; then
+  td log "ERROR: Running on $current instead of worktree branch. Aborting." -w "{{PROJECT_ROOT}}"
+  exit 1
+fi
 ```
 
 ## Workflow
@@ -24,6 +28,13 @@ git branch --show-current
 ### 1. Understand the Task
 
 Read the task title, description, acceptance criteria, and any previous handoff notes. If this task was previously rejected, pay close attention to the rejection reason.
+
+Check if there are existing commits from a previous implementation attempt:
+```bash
+git log --oneline main..HEAD
+```
+
+If there are prior commits, review them to understand what was already done. Build on the existing work — focus specifically on addressing the rejection reason rather than starting from scratch.
 
 ### 2. Explore the Codebase
 

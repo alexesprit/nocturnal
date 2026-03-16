@@ -83,11 +83,16 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         comments.len()
     );
 
-    let mut rendered = prompt::render(
+    let vcs_reply_cmd = match platform {
+        vcs::Platform::GitLab => format!("glab mr note {proposal_id} --message"),
+        vcs::Platform::GitHub => format!("gh pr comment {proposal_id} --body"),
+    };
+    let mut rendered = prompt::render_with_vcs(
         prompt::Template::ProposalReview,
         &task_id,
         &ctx.project_root,
         ctx.cfg.max_reviews,
+        &vcs_reply_cmd,
     );
     rendered.push_str(&format!(
         "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"

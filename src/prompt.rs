@@ -19,6 +19,35 @@ impl Template {
 }
 
 pub fn render(template: Template, task_id: &str, project_root: &str, max_reviews: u32) -> String {
+    render_base(template, task_id, project_root, max_reviews)
+}
+
+pub fn render_with_review_cycle(
+    template: Template,
+    task_id: &str,
+    project_root: &str,
+    max_reviews: u32,
+    review_cycle: Option<u32>,
+) -> String {
+    let mut result = render_base(template, task_id, project_root, max_reviews);
+    if let Some(cycle) = review_cycle {
+        result = result.replace("{{REVIEW_CYCLE}}", &cycle.to_string());
+    }
+    result
+}
+
+pub fn render_with_vcs(
+    template: Template,
+    task_id: &str,
+    project_root: &str,
+    max_reviews: u32,
+    vcs_reply_cmd: &str,
+) -> String {
+    render_base(template, task_id, project_root, max_reviews)
+        .replace("{{VCS_REPLY_CMD}}", vcs_reply_cmd)
+}
+
+fn render_base(template: Template, task_id: &str, project_root: &str, max_reviews: u32) -> String {
     template
         .content()
         .replace("{{TASK_ID}}", task_id)

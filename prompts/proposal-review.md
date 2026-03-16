@@ -14,9 +14,13 @@ td session --new "noc-proposal-{{TASK_ID}}" -w "{{PROJECT_ROOT}}"
 td show {{TASK_ID}} --long -w "{{PROJECT_ROOT}}"
 ```
 
-3. Confirm you are on the correct branch:
+3. Confirm you are on the correct branch (abort if on main):
 ```bash
-git branch --show-current
+current=$(git branch --show-current)
+if [ "$current" = "main" ] || [ "$current" = "master" ]; then
+  td log "ERROR: Running on $current instead of worktree branch. Aborting." -w "{{PROJECT_ROOT}}"
+  exit 1
+fi
 ```
 
 ## Your Task
@@ -28,17 +32,20 @@ The unresolved review comments are appended below. For each comment:
 
 ## After Fixing
 
-1. Amend the last commit with your fixes and force-push:
+1. Run the project's test suite to verify your changes do not break anything. If tests fail due to your changes, fix them before proceeding.
+
+2. Amend the last commit with your fixes and force-push:
 ```bash
 git add -A && git commit --amend --no-edit
 git push origin HEAD --force-with-lease
 ```
 
-2. Post a reply to each comment thread you addressed:
-   - GitLab: `glab mr note <iid> --message "Addressed: <brief summary>"`
-   - GitHub: `gh pr comment <number> --body "Addressed: <brief summary>"`
+3. Post a reply to each comment thread you addressed:
+```bash
+{{VCS_REPLY_CMD}} "Addressed: <brief summary>"
+```
 
-3. Log your work:
+4. Log your work:
 ```bash
 td log "Addressed proposal review comments" -w "{{PROJECT_ROOT}}"
 ```

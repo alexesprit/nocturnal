@@ -14,6 +14,15 @@ td session --new "noc-review-{{TASK_ID}}" -w "{{PROJECT_ROOT}}"
 td show {{TASK_ID}} --long -w "{{PROJECT_ROOT}}"
 ```
 
+3. Verify you are on the correct branch (abort if on main):
+```bash
+current=$(git branch --show-current)
+if [ "$current" = "main" ] || [ "$current" = "master" ]; then
+  td log "ERROR: Running on $current instead of worktree branch. Aborting." -w "{{PROJECT_ROOT}}"
+  exit 1
+fi
+```
+
 ## Review Process
 
 ### 1. Examine Changes
@@ -56,9 +65,7 @@ Evaluate the changes against these criteria:
 
 **Approve** if the implementation is correct, follows conventions, and meets acceptance criteria:
 ```bash
-existing=$(td show {{TASK_ID}} --json -w "{{PROJECT_ROOT}}" | jq -r '(.labels // []) | join(",")')
-new_labels="${existing:+${existing},}noc-proposal-ready"
-td update {{TASK_ID}} --labels "$new_labels" -w "{{PROJECT_ROOT}}"
+td update {{TASK_ID}} --labels "noc-proposal-ready" -w "{{PROJECT_ROOT}}"
 ```
 
 **Reject** if there are issues that must be fixed. Be specific about what needs to change:
@@ -66,7 +73,7 @@ td update {{TASK_ID}} --labels "$new_labels" -w "{{PROJECT_ROOT}}"
 td reject {{TASK_ID}} --reason "<specific issues that need fixing>" -w "{{PROJECT_ROOT}}"
 ```
 
-This is review cycle {{MAX_REVIEWS}} max. Be pragmatic — reject only for real issues, not style preferences.
+This is review cycle {{REVIEW_CYCLE}} of {{MAX_REVIEWS}}. Be pragmatic — reject only for real issues, not style preferences. On later cycles, prefer approving with notes over rejecting for minor issues.
 
 ## Rules
 

@@ -51,11 +51,13 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         )
     })?;
 
-    let rendered = prompt::render(
+    let review_cycle = review_count + 1;
+    let rendered = prompt::render_with_review_cycle(
         prompt::Template::Review,
         &task_id,
         &ctx.project_root,
         ctx.cfg.max_reviews,
+        Some(review_cycle),
     );
 
     let log_file = format!(
