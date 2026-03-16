@@ -162,3 +162,147 @@ pub fn swap_labels(task: &Task, remove_prefixes: &[&str], add_label: Option<&str
     }
     labels.join(",")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn task_with_labels(labels: &[&str]) -> Task {
+        Task {
+            id: "t1".to_string(),
+            title: String::new(),
+            description: String::new(),
+            status: String::new(),
+            labels: labels.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    // --- get_review_count ---
+
+    #[test]
+    fn get_review_count_returns_zero_when_no_label() {
+        let task = task_with_labels(&["bug", "urgent"]);
+        assert_eq!(get_review_count(&task), 0);
+    }
+
+    #[test]
+    fn get_review_count_returns_zero_for_empty_labels() {
+        let task = task_with_labels(&[]);
+        assert_eq!(get_review_count(&task), 0);
+    }
+
+    #[test]
+    fn get_review_count_parses_label() {
+        let task = task_with_labels(&["noc-reviews:2", "bug"]);
+        assert_eq!(get_review_count(&task), 2);
+    }
+
+    #[test]
+    fn get_review_count_returns_zero_for_malformed_value() {
+        let task = task_with_labels(&["noc-reviews:abc"]);
+        assert_eq!(get_review_count(&task), 0);
+    }
+
+    #[test]
+    fn get_review_count_returns_zero_for_empty_value() {
+        let task = task_with_labels(&["noc-reviews:"]);
+        assert_eq!(get_review_count(&task), 0);
+    }
+
+    // --- build_labels_with_review_count ---
+
+    #[test]
+    fn build_labels_replaces_existing_review_count() {
+        let task = task_with_labels(&["bug", "noc-reviews:1"]);
+        assert_eq!(
+            build_labels_with_review_count(&task, 2),
+            "bug,noc-reviews:2"
+        );
+    }
+
+    #[test]
+    fn build_labels_adds_count_when_missing() {
+        let task = task_with_labels(&["bug"]);
+        assert_eq!(
+            build_labels_with_review_count(&task, 1),
+            "bug,noc-reviews:1"
+        );
+    }
+
+    #[test]
+    fn build_labels_with_empty_labels() {
+        let task = task_with_labels(&[]);
+        assert_eq!(build_labels_with_review_count(&task, 0), "noc-reviews:0");
+    }
+
+    // --- swap_label ---
+
+    #[test]
+    fn swap_label_removes_prefix_and_adds_new() {
+        let task = task_with_labels(&["noc-proposal:42", "bug"]);
+        assert_eq!(
+            swap_label(&task, "noc-proposal", Some("noc-done")),
+            "bug,noc-done"
+        );
+    }
+
+    #[test]
+    fn swap_label_removes_without_adding() {
+        let task = task_with_labels(&["noc-proposal:42", "bug"]);
+        assert_eq!(swap_label(&task, "noc-proposal", None), "bug");
+    }
+
+    #[test]
+    fn swap_label_no_match_keeps_all_and_adds() {
+        let task = task_with_labels(&["bug", "urgent"]);
+        assert_eq!(
+            swap_label(&task, "noc-proposal", Some("new")),
+            "bug,urgent,new"
+        );
+    }
+
+    // --- swap_labels (multiple prefixes) ---
+
+    #[test]
+    fn swap_labels_removes_multiple_prefixes() {
+        let task = task_with_labels(&["noc-proposal:42", "noc-proposal-ready", "bug"]);
+        assert_eq!(
+            swap_labels(
+                &task,
+                &["noc-proposal:", "noc-proposal-ready"],
+                Some("done")
+            ),
+            "bug,done"
+        );
+    }
+
+    // --- Task deserialization ---
+
+    #[test]
+    fn task_deserializes_with_null_fields() {
+        let json =
+            r#"{"id": "t1", "title": null, "description": null, "status": null, "labels": null}"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.id, "t1");
+        assert_eq!(task.title, "");
+        assert_eq!(task.description, "");
+        assert_eq!(task.status, "");
+        assert!(task.labels.is_empty());
+    }
+
+    #[test]
+    fn task_deserializes_with_missing_fields() {
+        let json = r#"{"id": "t1"}"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.id, "t1");
+        assert!(task.labels.is_empty());
+    }
+
+    #[test]
+    fn task_deserializes_with_full_fields() {
+        let json = r#"{"id": "t1", "title": "Fix bug", "description": "desc", "status": "open", "labels": ["a", "b"]}"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.title, "Fix bug");
+        assert_eq!(task.labels, vec!["a", "b"]);
+    }
+}

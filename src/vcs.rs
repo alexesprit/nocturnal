@@ -306,3 +306,78 @@ fn extract_trailing_number(s: &str) -> Result<String> {
     }
     Ok(id)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- extract_trailing_number ---
+
+    #[test]
+    fn extract_trailing_number_from_mr_url() {
+        let id =
+            extract_trailing_number("https://gitlab.com/org/repo/-/merge_requests/42").unwrap();
+        assert_eq!(id, "42");
+    }
+
+    #[test]
+    fn extract_trailing_number_from_pr_url() {
+        let id = extract_trailing_number("https://github.com/org/repo/pull/123").unwrap();
+        assert_eq!(id, "123");
+    }
+
+    #[test]
+    fn extract_trailing_number_single_digit() {
+        assert_eq!(extract_trailing_number("url/7").unwrap(), "7");
+    }
+
+    #[test]
+    fn extract_trailing_number_no_digits() {
+        assert!(extract_trailing_number("no-digits-here").is_err());
+    }
+
+    #[test]
+    fn extract_trailing_number_empty_string() {
+        assert!(extract_trailing_number("").is_err());
+    }
+
+    #[test]
+    fn extract_trailing_number_digits_in_middle_only() {
+        // "abc123def" — no trailing digits
+        assert!(extract_trailing_number("abc123def").is_err());
+    }
+
+    // --- detect_platform (override paths only, no git calls) ---
+
+    #[test]
+    fn detect_platform_disabled_override() {
+        let ov = Some(VcsPlatformOverride::Disabled);
+        assert!(detect_platform("/unused", &ov).is_none());
+    }
+
+    #[test]
+    fn detect_platform_forced_github() {
+        let ov = Some(VcsPlatformOverride::Forced("github".to_string()));
+        assert_eq!(detect_platform("/unused", &ov).unwrap(), Platform::GitHub);
+    }
+
+    #[test]
+    fn detect_platform_forced_gitlab() {
+        let ov = Some(VcsPlatformOverride::Forced("gitlab".to_string()));
+        assert_eq!(detect_platform("/unused", &ov).unwrap(), Platform::GitLab);
+    }
+
+    #[test]
+    fn detect_platform_forced_unknown() {
+        let ov = Some(VcsPlatformOverride::Forced("bitbucket".to_string()));
+        assert!(detect_platform("/unused", &ov).is_none());
+    }
+
+    // --- Platform display ---
+
+    #[test]
+    fn platform_display() {
+        assert_eq!(Platform::GitHub.to_string(), "github");
+        assert_eq!(Platform::GitLab.to_string(), "gitlab");
+    }
+}

@@ -108,3 +108,44 @@ pub fn check_td_init(project_root: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slug_from_simple_path() {
+        assert_eq!(project_slug("/home/user/my-project"), "my-project");
+    }
+
+    #[test]
+    fn slug_strips_special_characters() {
+        assert_eq!(project_slug("/path/to/my project!@#"), "myproject");
+    }
+
+    #[test]
+    fn slug_preserves_underscores_and_dashes() {
+        assert_eq!(project_slug("/path/my_cool-project"), "my_cool-project");
+    }
+
+    #[test]
+    fn slug_from_path_without_slashes() {
+        assert_eq!(project_slug("project"), "project");
+    }
+
+    #[test]
+    fn slug_from_empty_string() {
+        assert_eq!(project_slug(""), "");
+    }
+
+    #[test]
+    fn slug_from_trailing_slash() {
+        // rsplit('/').next() on "foo/" gives ""
+        assert_eq!(project_slug("/path/to/project/"), "");
+    }
+
+    #[test]
+    fn slug_from_root_path() {
+        assert_eq!(project_slug("/"), "");
+    }
+}
