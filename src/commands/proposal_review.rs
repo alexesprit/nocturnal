@@ -94,12 +94,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
             "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"
         ));
 
-        let log_file = format!(
-            "{}/proposal-review-{}-{}.log",
-            ctx.cfg.log_dir,
-            task_id,
-            chrono::Local::now().format("%Y%m%d-%H%M%S")
-        );
+        let log_file = claude::log_path(&ctx.cfg.log_dir, "proposal-review", &task_id);
 
         if claude::run(ctx, &wt_path, &rendered, &log_file)? {
             info!("Proposal review completed");

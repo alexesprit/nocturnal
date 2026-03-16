@@ -42,12 +42,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         ctx.cfg.max_reviews,
     );
 
-    let log_file = format!(
-        "{}/implement-{}-{}.log",
-        ctx.cfg.log_dir,
-        task_id,
-        chrono::Local::now().format("%Y%m%d-%H%M%S")
-    );
+    let log_file = claude::log_path(&ctx.cfg.log_dir, "implement", &task_id);
 
     if claude::run(ctx, &wt_path, &rendered, &log_file)? {
         info!("Implementation completed");

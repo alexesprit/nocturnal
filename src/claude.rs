@@ -6,6 +6,16 @@ use tracing::info;
 
 use crate::config::ProjectContext;
 
+pub fn log_path(log_dir: &str, command: &str, task_id: &str) -> String {
+    format!(
+        "{}/{}-{}-{}.log",
+        log_dir,
+        command,
+        task_id,
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    )
+}
+
 pub fn run(ctx: &ProjectContext, wt_path: &str, prompt: &str, log_file: &str) -> Result<bool> {
     fs::create_dir_all(&ctx.cfg.log_dir).ok();
 

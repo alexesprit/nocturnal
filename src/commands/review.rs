@@ -60,12 +60,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         Some(review_cycle),
     );
 
-    let log_file = format!(
-        "{}/review-{}-{}.log",
-        ctx.cfg.log_dir,
-        task_id,
-        chrono::Local::now().format("%Y%m%d-%H%M%S")
-    );
+    let log_file = claude::log_path(&ctx.cfg.log_dir, "review", &task_id);
 
     if !claude::run(ctx, &wt_path, &rendered, &log_file)? {
         error!("Review failed (exit code nonzero)");
