@@ -2,7 +2,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
-use crate::config::VcsPlatformOverride;
+use crate::project_config::VcsMode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Platform {
@@ -19,20 +19,12 @@ impl std::fmt::Display for Platform {
     }
 }
 
-pub fn detect_platform(
-    project_root: &str,
-    override_: &Option<VcsPlatformOverride>,
-) -> Option<Platform> {
-    match override_ {
-        Some(VcsPlatformOverride::Disabled) => return None,
-        Some(VcsPlatformOverride::Forced(p)) => {
-            return match p.as_str() {
-                "github" => Some(Platform::GitHub),
-                "gitlab" => Some(Platform::GitLab),
-                _ => None,
-            };
-        }
-        None => {}
+pub fn detect_platform(project_root: &str, vcs_mode: VcsMode) -> Option<Platform> {
+    match vcs_mode {
+        VcsMode::Off => return None,
+        VcsMode::GitHub => return Some(Platform::GitHub),
+        VcsMode::GitLab => return Some(Platform::GitLab),
+        VcsMode::Auto => {}
     }
 
     let url = crate::git::remote_url(project_root)?;
@@ -347,30 +339,27 @@ mod tests {
         assert!(extract_trailing_number("abc123def").is_err());
     }
 
-    // --- detect_platform (override paths only, no git calls) ---
+    // --- detect_platform (mode-based, no git calls) ---
 
     #[test]
-    fn detect_platform_disabled_override() {
-        let ov = Some(VcsPlatformOverride::Disabled);
-        assert!(detect_platform("/unused", &ov).is_none());
+    fn detect_platform_off() {
+        assert!(detect_platform("/unused", VcsMode::Off).is_none());
     }
 
     #[test]
     fn detect_platform_forced_github() {
-        let ov = Some(VcsPlatformOverride::Forced("github".to_string()));
-        assert_eq!(detect_platform("/unused", &ov).unwrap(), Platform::GitHub);
+        assert_eq!(
+            detect_platform("/unused", VcsMode::GitHub).unwrap(),
+            Platform::GitHub
+        );
     }
 
     #[test]
     fn detect_platform_forced_gitlab() {
-        let ov = Some(VcsPlatformOverride::Forced("gitlab".to_string()));
-        assert_eq!(detect_platform("/unused", &ov).unwrap(), Platform::GitLab);
-    }
-
-    #[test]
-    fn detect_platform_forced_unknown() {
-        let ov = Some(VcsPlatformOverride::Forced("bitbucket".to_string()));
-        assert!(detect_platform("/unused", &ov).is_none());
+        assert_eq!(
+            detect_platform("/unused", VcsMode::GitLab).unwrap(),
+            Platform::GitLab
+        );
     }
 
     // --- Platform display ---

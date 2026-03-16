@@ -161,7 +161,6 @@ All configuration is via environment variables:
 | `NOCTURNAL_PROJECTS` | — | Colon-separated project paths (alternative to projects file) |
 | `NOCTURNAL_PROJECTS_FILE` | `~/.config/nocturnal/projects` | Project list file |
 | `NOCTURNAL_ROTATION_STATE` | `~/.config/nocturnal/rotation-state` | Rotation index persistence |
-| `NOCTURNAL_VCS_PLATFORM` | auto-detect | Force `gitlab`, `github`, or `none` to disable proposals |
 
 ## Task Lifecycle
 
@@ -183,15 +182,23 @@ nocturnal tracks state through `td` statuses and labels:
 
 ## VCS Integration
 
-nocturnal auto-detects GitLab or GitHub from the `origin` remote URL. When a task passes internal review:
+VCS integration is configured per project via `.nocturnal.toml` in the project root:
+
+```toml
+# "auto"   — detect GitLab/GitHub from origin remote URL
+# "github" — force GitHub
+# "gitlab" — force GitLab
+# "off"    — no proposals (default if file is missing)
+vcs = "auto"
+```
+
+When VCS is enabled and a task passes internal review:
 
 1. Branch is pushed to origin
 2. MR (GitLab) or PR (GitHub) is created with the task title and description
 3. Auto-merge is enabled if the platform supports it
 4. On subsequent runs, nocturnal checks for unresolved comments and runs Claude to address them
 5. Once the proposal is merged, the task is closed
-
-Disable with `NOCTURNAL_VCS_PLATFORM=none` to keep the orchestrator local-only.
 
 ## Logs
 

@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod git;
 mod lock;
+mod project_config;
 mod prompt;
 mod td;
 mod vcs;

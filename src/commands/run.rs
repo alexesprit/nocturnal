@@ -22,7 +22,7 @@ pub fn run_inner(ctx: &ProjectContext) -> Result<bool> {
     let td = Td::new(&ctx.project_root);
 
     // Check for tasks with open proposals first
-    let platform = vcs::detect_platform(&ctx.project_root, &ctx.cfg.vcs_platform_override);
+    let platform = vcs::detect_platform(&ctx.project_root, ctx.vcs_mode);
     if platform.is_some() && !td.get_proposal_task_ids()?.is_empty() {
         info!("Found tasks with open proposals, running proposal review");
         super::proposal_review::run_unlocked(ctx)?;

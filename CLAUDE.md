@@ -44,6 +44,11 @@ Logs go to `$TMPDIR/nocturnal-logs/`. Check with:
 ls -lt ${TMPDIR}/nocturnal-logs/
 ```
 
+## Per-Project Configuration
+
+Each project can have a `.nocturnal.toml` in its root. Currently supports:
+- `vcs` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.
+
 ## Rust Conventions
 
 - External commands (`td`, `git`, `claude`, `glab`/`gh`) are invoked via `std::process::Command`

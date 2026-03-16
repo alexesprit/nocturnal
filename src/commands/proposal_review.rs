@@ -20,7 +20,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         return Ok(());
     }
 
-    let platform = vcs::detect_platform(&ctx.project_root, &ctx.cfg.vcs_platform_override)
+    let platform = vcs::detect_platform(&ctx.project_root, ctx.vcs_mode)
         .ok_or_else(|| anyhow::anyhow!("No VCS platform detected"))?;
 
     for task_id in task_ids {
@@ -110,7 +110,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
 }
 
 pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
-    let platform = vcs::detect_platform(&ctx.project_root, &ctx.cfg.vcs_platform_override)
+    let platform = vcs::detect_platform(&ctx.project_root, ctx.vcs_mode)
         .ok_or_else(|| anyhow::anyhow!("No VCS platform detected — cannot create proposal"))?;
 
     let wt_path = git::worktree_path(&ctx.project_root, task_id)?

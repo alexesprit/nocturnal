@@ -4,6 +4,8 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
+use crate::project_config::{self, VcsMode};
+
 #[derive(Clone)]
 pub struct Config {
     pub max_reviews: u32,
@@ -13,23 +15,22 @@ pub struct Config {
     pub log_dir: String,
     pub projects_file: String,
     pub rotation_state_file: String,
-    pub vcs_platform_override: Option<VcsPlatformOverride>,
-}
-
-#[derive(Clone)]
-pub enum VcsPlatformOverride {
-    Disabled,
-    Forced(String),
 }
 
 pub struct ProjectContext {
     pub cfg: Config,
     pub project_root: String,
+    pub vcs_mode: VcsMode,
 }
 
 impl ProjectContext {
     pub fn new(cfg: Config, project_root: String) -> Self {
-        Self { cfg, project_root }
+        let vcs_mode = project_config::load_vcs_mode(&project_root);
+        Self {
+            cfg,
+            project_root,
+            vcs_mode,
+        }
     }
 
     pub fn project_slug(&self) -> String {
@@ -56,14 +57,6 @@ impl Config {
             "/tmp".to_string()
         });
 
-        let vcs_platform_override =
-            env::var("NOCTURNAL_VCS_PLATFORM")
-                .ok()
-                .map(|v| match v.as_str() {
-                    "none" | "off" | "disabled" => VcsPlatformOverride::Disabled,
-                    other => VcsPlatformOverride::Forced(other.to_string()),
-                });
-
         Config {
             max_reviews: env_u32("NOCTURNAL_MAX_REVIEWS", 3),
             max_budget: env_u32("NOCTURNAL_MAX_BUDGET", 5),
@@ -75,7 +68,6 @@ impl Config {
                 .unwrap_or_else(|_| format!("{home}/.config/nocturnal/projects")),
             rotation_state_file: env::var("NOCTURNAL_ROTATION_STATE")
                 .unwrap_or_else(|_| format!("{home}/.config/nocturnal/rotation-state")),
-            vcs_platform_override,
         }
     }
 
