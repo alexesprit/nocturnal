@@ -23,7 +23,7 @@
         </thead>
         <tbody>
             {% for entry in orchestrator.recent_logs %}
-            <tr>
+            <tr{% if !entry.project.is_empty() && !entry.task_id.is_empty() %} data-href="/projects/{{ entry.project }}/issues/{{ entry.task_id }}" tabindex="0" role="link"{% endif %}>
                 <td>{{ entry.command }}</td>
                 <td>{{ entry.project }}</td>
                 <td><code>{{ entry.task_id }}</code></td>
