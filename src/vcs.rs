@@ -81,15 +81,16 @@ pub fn create_proposal(
                 bail!("Failed to create GitLab MR: {}", stderr.trim());
             }
 
-            let combined = format!(
-                "{}{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-
-            let url = combined
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let url = stdout
                 .split_whitespace()
                 .find(|s| s.starts_with("https://"))
+                .or_else(|| {
+                    stderr
+                        .split_whitespace()
+                        .find(|s| s.starts_with("https://"))
+                })
                 .unwrap_or("")
                 .to_string();
 
