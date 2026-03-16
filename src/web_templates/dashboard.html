@@ -5,9 +5,9 @@
     <h2>Orchestrator</h2>
     <dl class="orchestrator-dl">
         <dt>Last Project</dt>
-        <dd>{% if let Some(current) = orchestrator.current_project %}{{ current }}{% else %}-{% endif %}</dd>
+        <dd>{% if let Some(current) = orchestrator.current_project %}<a href="/projects/{{ current }}">{{ current }}</a>{% else %}-{% endif %}</dd>
         <dt>Next Project</dt>
-        <dd>{% if let Some(next) = orchestrator.next_project %}{{ next }}{% else %}-{% endif %}</dd>
+        <dd>{% if let Some(next) = orchestrator.next_project %}<a href="/projects/{{ next }}">{{ next }}</a>{% else %}-{% endif %}</dd>
     </dl>
     {% if !orchestrator.recent_logs.is_empty() %}
     <h3>Recent Activity</h3>
@@ -25,7 +25,7 @@
             {% for entry in orchestrator.recent_logs %}
             <tr{% if !entry.project.is_empty() && !entry.task_id.is_empty() %} data-href="/projects/{{ entry.project }}/issues/{{ entry.task_id }}" tabindex="0" role="link"{% endif %}>
                 <td>{{ entry.command }}</td>
-                <td>{{ entry.project }}</td>
+                <td>{% if !entry.project.is_empty() %}<a href="/projects/{{ entry.project }}">{{ entry.project }}</a>{% endif %}</td>
                 <td><code>{{ entry.task_id }}</code></td>
                 <td>{{ entry.started }}</td>
                 <td>{{ entry.duration }}</td>
