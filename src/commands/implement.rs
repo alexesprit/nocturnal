@@ -35,7 +35,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
 
     td.start(&task_id).ok();
 
-    let rendered = prompt::render(
+    let rendered = prompt::render_base(
         prompt::Template::Implement,
         &task_id,
         &ctx.project_root,

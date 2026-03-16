@@ -18,10 +18,6 @@ impl Template {
     }
 }
 
-pub fn render(template: Template, task_id: &str, project_root: &str, max_reviews: u32) -> String {
-    render_base(template, task_id, project_root, max_reviews)
-}
-
 pub fn render_with_review_cycle(
     template: Template,
     task_id: &str,
@@ -47,7 +43,12 @@ pub fn render_with_vcs(
         .replace("{{VCS_REPLY_CMD}}", vcs_reply_cmd)
 }
 
-fn render_base(template: Template, task_id: &str, project_root: &str, max_reviews: u32) -> String {
+pub fn render_base(
+    template: Template,
+    task_id: &str,
+    project_root: &str,
+    max_reviews: u32,
+) -> String {
     template
         .content()
         .replace("{{TASK_ID}}", task_id)
