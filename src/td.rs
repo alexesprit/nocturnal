@@ -147,10 +147,14 @@ pub fn build_labels_with_review_count(task: &Task, count: u32) -> String {
 }
 
 pub fn swap_label(task: &Task, remove_prefix: &str, add_label: Option<&str>) -> String {
+    swap_labels(task, &[remove_prefix], add_label)
+}
+
+pub fn swap_labels(task: &Task, remove_prefixes: &[&str], add_label: Option<&str>) -> String {
     let mut labels: Vec<String> = task
         .labels
         .iter()
-        .filter(|l| !l.starts_with(remove_prefix))
+        .filter(|l| !remove_prefixes.iter().any(|p| l.starts_with(p)))
         .cloned()
         .collect();
     if let Some(add) = add_label {

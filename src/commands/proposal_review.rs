@@ -49,16 +49,13 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
             }
             vcs::ProposalState::Closed => {
                 info!("Proposal #{proposal_id} closed without merge — rejecting task");
-                let review_count = td::get_review_count(&task);
-                let new_count = review_count + 1;
-                let mut labels: Vec<String> = task
-                    .labels
-                    .iter()
-                    .filter(|l| !l.starts_with("noc-proposal:") && !l.starts_with("noc-reviews:"))
-                    .cloned()
-                    .collect();
-                labels.push(format!("noc-reviews:{new_count}"));
-                td_client.update_labels(&task_id, &labels.join(","))?;
+                let new_count = td::get_review_count(&task) + 1;
+                let labels = td::swap_labels(
+                    &task,
+                    &["noc-proposal:", "noc-reviews:"],
+                    Some(&format!("noc-reviews:{new_count}")),
+                );
+                td_client.update_labels(&task_id, &labels)?;
                 td_client
                     .reject(&task_id, "Proposal closed without merging")
                     .ok();
