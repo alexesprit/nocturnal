@@ -74,6 +74,18 @@ nocturnal review           # Pick and review the next reviewable task
 nocturnal proposal-review  # Address comments on open MR/PR
 ```
 
+### Web Dashboard
+
+Start a read-only dashboard to browse tasks across all configured projects:
+
+```bash
+nocturnal web                        # http://localhost:8090
+nocturnal web --port 3000            # custom port
+nocturnal web --addr 0.0.0.0         # listen on all interfaces
+```
+
+Requires projects to be configured (via `NOCTURNAL_PROJECTS` env var or the projects file). The dashboard shows task lists per project and individual task detail pages.
+
 ### Multiple Projects
 
 Create a project list at `~/.config/nocturnal/projects`:

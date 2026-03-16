@@ -1,0 +1,46 @@
+<form
+    hx-get="/projects/{{ name }}/issues"
+    hx-target="#issue-table-body"
+    hx-trigger="change from:select, keyup changed delay:300ms from:input"
+    hx-swap="innerHTML"
+>
+    <fieldset role="group">
+        <select name="status" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="blocked">Blocked</option>
+            <option value="in_review">In Review</option>
+            <option value="closed">Closed</option>
+        </select>
+        <select name="priority" aria-label="Filter by priority">
+            <option value="">All priorities</option>
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+            <option value="P4">P4</option>
+        </select>
+        <select name="type" aria-label="Filter by type">
+            <option value="">All types</option>
+            <option value="bug">Bug</option>
+            <option value="feature">Feature</option>
+            <option value="task">Task</option>
+            <option value="epic">Epic</option>
+            <option value="chore">Chore</option>
+        </select>
+        <input
+            type="search"
+            name="q"
+            placeholder="Search issues..."
+            aria-label="Search issues"
+        />
+        <select name="sort" aria-label="Sort by">
+            <option value="">Sort by default</option>
+            <option value="updated">Updated</option>
+            <option value="created">Created</option>
+            <option value="priority">Priority</option>
+            <option value="status">Status</option>
+        </select>
+    </fieldset>
+</form>

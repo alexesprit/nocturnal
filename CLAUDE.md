@@ -24,6 +24,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Worktree-to-task mapping:** Branch naming convention `nocturnal/<task-id>` links worktrees to td tasks. `worktree_path()` scans `git worktree list --porcelain` to resolve paths.
 
+## Web Dashboard
+
+`nocturnal web` starts a read-only axum HTTP server (default `localhost:8090`) that renders td task lists and detail pages across all configured projects. Templates live in `src/web_templates/` (askama), static assets in `src/static/`. The `src/web/` module contains handlers, models, markdown rendering (pulldown-cmark), and template filters. Binds only to loopback by default; warns if a non-loopback address is given.
+
 ## External Dependencies
 
 - `td` — task management CLI (github.com/marcus/td), stores data in `.todos/` at project root

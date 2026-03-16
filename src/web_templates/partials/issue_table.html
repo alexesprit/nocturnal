@@ -1,0 +1,21 @@
+{% if issues.is_empty() %}
+<tr>
+    <td colspan="7">No issues found.</td>
+</tr>
+{% else %}
+{% for issue in issues %}
+<tr data-href="/projects/{{ name }}/issues/{{ issue.id }}" tabindex="0" role="link">
+    <td>{{ issue.id }}</td>
+    <td>{{ issue.title }}</td>
+    <td>
+        <span class="badge badge-status badge-status-{{ issue.status }}">{{ issue.status }}</span>
+    </td>
+    <td>
+        <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
+    </td>
+    <td>{{ issue.task_type }}</td>
+    <td>{{ issue.labels|join_labels(", ") }}</td>
+    <td>{{ issue.updated_at|format_date }}</td>
+</tr>
+{% endfor %}
+{% endif %}

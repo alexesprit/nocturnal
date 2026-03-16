@@ -1,0 +1,155 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<header>
+    <h1>{{ issue.title }}</h1>
+    <p>
+        <small>{{ issue.id }}</small>
+        <span class="badge badge-status badge-status-{{ issue.status }}">{{ issue.status }}</span>
+        <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
+        <span>{{ issue.issue_type }}</span>
+    </p>
+</header>
+<section>
+    <h2>Metadata</h2>
+    <dl>
+        {% if let Some(points) = issue.points %}
+        <dt>Points</dt>
+        <dd>{{ points }}</dd>
+        {% endif %}
+        {% if !issue.labels.is_empty() %}
+        <dt>Labels</dt>
+        <dd>{{ issue.labels|join_labels(", ") }}</dd>
+        {% endif %}
+        {% if !issue.sprint.is_empty() %}
+        <dt>Sprint</dt>
+        <dd>{{ issue.sprint }}</dd>
+        {% endif %}
+        <dt>Created</dt>
+        <dd>{{ issue.created_at|format_datetime }}</dd>
+        <dt>Updated</dt>
+        <dd>{{ issue.updated_at|format_datetime }}</dd>
+        {% if !issue.closed_at.is_empty() %}
+        <dt>Closed</dt>
+        <dd>{{ issue.closed_at|format_datetime }}</dd>
+        {% endif %}
+        {% if !issue.defer_date.is_empty() %}
+        <dt>Defer Date</dt>
+        <dd>{{ issue.defer_date|format_date }}</dd>
+        {% endif %}
+        {% if !issue.due_date.is_empty() %}
+        <dt>Due Date</dt>
+        <dd>{{ issue.due_date|format_date }}</dd>
+        {% endif %}
+    </dl>
+</section>
+{% if !issue.description.is_empty() %}
+<section>
+    <h2>Description</h2>
+    <div class="markdown">
+        {{ issue.description|render_markdown|safe }}
+    </div>
+</section>
+{% endif %}
+{% if !issue.acceptance.is_empty() %}
+<section>
+    <h2>Acceptance Criteria</h2>
+    <div class="markdown">
+        {{ issue.acceptance|render_markdown|safe }}
+    </div>
+</section>
+{% endif %}
+{% if !issue.parent_id.is_empty() %}
+<section>
+    <h2>Parent</h2>
+    <p>
+        <a href="/projects/{{ project_name }}/issues/{{ issue.parent_id }}">
+            {{ issue.parent_id }}
+        </a>
+    </p>
+</section>
+{% endif %}
+{% if !issue.children.is_empty() %}
+<section>
+    <h2>Children</h2>
+    <ul>
+        {% for child in issue.children %}
+        <li>
+            <a href="/projects/{{ project_name }}/issues/{{ child.id }}">
+                {{ child.id }}
+            </a>
+            — {{ child.title }}
+            <span class="badge badge-status badge-status-{{ child.status }}">{{ child.status }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+{% if !issue.depends_on.is_empty() %}
+<section>
+    <h2>Depends On</h2>
+    <ul>
+        {% for dep in issue.depends_on %}
+        <li>
+            <a href="/projects/{{ project_name }}/issues/{{ dep }}">
+                {{ dep }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+{% if !issue.blocked_by.is_empty() %}
+<section>
+    <h2>Blocked By</h2>
+    <ul>
+        {% for blocker in issue.blocked_by %}
+        <li>
+            <a href="/projects/{{ project_name }}/issues/{{ blocker }}">
+                {{ blocker }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+{% if !issue.comments.is_empty() %}
+<section>
+    <h2>Comments</h2>
+    {% for comment in issue.comments %}
+    <article>
+        <header>
+            <strong>{{ comment.author }}</strong>
+            <small>{{ comment.created|format_datetime }}</small>
+        </header>
+        <div class="markdown">
+            {{ comment.body|render_markdown|safe }}
+        </div>
+    </article>
+    {% endfor %}
+</section>
+{% endif %}
+{% if !issue.activity.is_empty() %}
+<section>
+    <h2>Activity</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Timestamp</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in issue.activity %}
+            <tr>
+                <td>{{ entry.action }}</td>
+                <td>{{ entry.timestamp|format_datetime }}</td>
+                <td>{{ entry.details }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+{% endblock %}

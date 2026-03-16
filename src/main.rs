@@ -7,6 +7,7 @@ mod project_config;
 mod prompt;
 mod td;
 mod vcs;
+mod web;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -40,6 +41,15 @@ enum Command {
     Rotate,
     /// Run 'run' for every project in the project list (same tick)
     Foreach,
+    /// Start a read-only web dashboard for td-managed projects
+    Web {
+        /// Server listen port
+        #[arg(long, default_value = "8090")]
+        port: u16,
+        /// Bind address
+        #[arg(long, default_value = "localhost")]
+        addr: String,
+    },
 }
 
 fn main() {
@@ -66,6 +76,7 @@ fn run(cli: Cli) -> Result<()> {
     match command {
         Command::Rotate => commands::rotate::run(&cfg),
         Command::Foreach => commands::foreach::run(&cfg),
+        Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
         _ => {
             let project_root = match cli.project {
                 Some(p) => p,
@@ -79,7 +90,7 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Implement => commands::implement::run(&ctx),
                 Command::Review => commands::review::run(&ctx),
                 Command::ProposalReview => commands::proposal_review::run(&ctx),
-                Command::Rotate | Command::Foreach => unreachable!(),
+                Command::Rotate | Command::Foreach | Command::Web { .. } => unreachable!(),
             }
         }
     }

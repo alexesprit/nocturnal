@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Deserializer};
 use tracing::debug;
 
-fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+pub(crate) fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
     T: Default + Deserialize<'de>,
@@ -12,6 +12,7 @@ where
     Ok(Option::deserialize(deserializer)?.unwrap_or_default())
 }
 
+#[allow(dead_code)] // fields used by askama templates
 #[derive(Debug, Deserialize)]
 pub struct Task {
     pub id: String,
@@ -23,6 +24,22 @@ pub struct Task {
     pub status: String,
     #[serde(default, deserialize_with = "null_as_default")]
     pub labels: Vec<String>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub priority: String,
+    #[serde(rename = "type", default, deserialize_with = "null_as_default")]
+    pub task_type: String,
+    #[serde(default)]
+    pub points: Option<i32>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub sprint: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub created_at: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub updated_at: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub closed_at: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub parent_id: String,
 }
 
 pub struct Td<'a> {
@@ -176,6 +193,14 @@ mod tests {
             description: String::new(),
             status: String::new(),
             labels: labels.iter().map(|s| s.to_string()).collect(),
+            priority: String::new(),
+            task_type: String::new(),
+            points: None,
+            sprint: String::new(),
+            created_at: String::new(),
+            updated_at: String::new(),
+            closed_at: String::new(),
+            parent_id: String::new(),
         }
     }
 

@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block content %}
+{% if projects.is_empty() %}
+<p>No projects configured.</p>
+{% else %}
+<div class="project-grid">
+    {% for project in projects %}
+    <article data-href="/projects/{{ project.name }}">
+        <header>
+            <h3>{{ project.name }}</h3>
+            <p><small>{{ project.path }}</small></p>
+        </header>
+        {% if let Some(err) = project.error %}
+        <p class="notice-error">{{ err }}</p>
+        {% else %}
+        <dl>
+            <dt>Open</dt>
+            <dd>{{ project.counts.open }}</dd>
+            <dt>In Prog</dt>
+            <dd>{{ project.counts.in_progress }}</dd>
+            <dt>Blocked</dt>
+            <dd>{{ project.counts.blocked }}</dd>
+            <dt>Review</dt>
+            <dd>{{ project.counts.in_review }}</dd>
+        </dl>
+        <p>
+            Total open: <strong>{{ project.total }}</strong>
+        </p>
+        {% endif %}
+    </article>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+
+{% block content %}
+{% include "partials/filters.html" %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Type</th>
+            <th>Labels</th>
+            <th>Updated</th>
+        </tr>
+    </thead>
+    <tbody id="issue-table-body">
+        {% include "partials/issue_table.html" %}
+    </tbody>
+</table>
+{% endblock %}
