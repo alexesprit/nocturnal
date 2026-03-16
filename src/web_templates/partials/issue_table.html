@@ -5,7 +5,7 @@
 {% else %}
 {% for issue in issues %}
 <tr data-href="/projects/{{ name }}/issues/{{ issue.id }}" tabindex="0" role="link">
-    <td>{{ issue.id }}</td>
+    <td><code>{{ issue.id }}</code></td>
     <td>{{ issue.title }}</td>
     <td>
         <span class="badge badge-status badge-status-{{ issue.status }}">{{ issue.status }}</span>

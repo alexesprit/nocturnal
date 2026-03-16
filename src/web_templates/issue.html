@@ -4,7 +4,7 @@
 <header>
     <h1>{{ issue.title }}</h1>
     <p>
-        <small>{{ issue.id }}</small>
+        <code>{{ issue.id }}</code>
         <span class="badge badge-status badge-status-{{ issue.status }}">{{ issue.status }}</span>
         <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
         {% if let Some(noc) = noc_state %}

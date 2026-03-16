@@ -869,7 +869,7 @@ main > section > article pre {
   font-size: 0.88rem;
 }
 
-.recent-logs-table code {
+td code {
   font-family: var(--font-mono);
   font-size: 0.82rem;
   background: var(--bg-tertiary);
