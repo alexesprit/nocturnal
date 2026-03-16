@@ -58,10 +58,7 @@ pub fn run(cfg: &Config) -> Result<()> {
 
         fs::write(&cfg.rotation_state_file, idx.to_string()).ok();
 
-        let ctx = ProjectContext::new(
-            Config::from_env(), // fresh config per project
-            project_root.clone(),
-        );
+        let ctx = ProjectContext::new(cfg.clone(), project_root.clone());
 
         match super::run::run_inner(&ctx) {
             Ok(true) => return Ok(()),

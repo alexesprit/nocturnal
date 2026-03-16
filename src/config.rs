@@ -4,6 +4,7 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
+#[derive(Clone)]
 pub struct Config {
     pub max_reviews: u32,
     pub max_budget: u32,
@@ -15,6 +16,7 @@ pub struct Config {
     pub vcs_platform_override: Option<VcsPlatformOverride>,
 }
 
+#[derive(Clone)]
 pub enum VcsPlatformOverride {
     Disabled,
     Forced(String),

@@ -34,7 +34,7 @@ pub fn run(cfg: &Config) -> Result<()> {
             }
         };
 
-        let ctx = ProjectContext::new(Config::from_env(), project_root.clone());
+        let ctx = ProjectContext::new(cfg.clone(), project_root.to_string());
 
         match super::run::run_inner(&ctx) {
             Ok(_) => {}
