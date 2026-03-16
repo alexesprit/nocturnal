@@ -210,15 +210,18 @@ pub fn fetch_unresolved_comments(
                 .output()
                 .context("Failed to fetch GitLab discussions")?;
 
+            const EMPTY: &[serde_json::Value] = &[];
             let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
             let comments: Vec<serde_json::Value> = json
                 .as_array()
-                .unwrap_or(&vec![])
+                .map(Vec::as_slice)
+                .unwrap_or(EMPTY)
                 .iter()
                 .flat_map(|d| {
                     d["notes"]
                         .as_array()
-                        .unwrap_or(&vec![])
+                        .map(Vec::as_slice)
+                        .unwrap_or(EMPTY)
                         .iter()
                         .filter(|n| n["resolved"] == false)
                         .map(|n| {
