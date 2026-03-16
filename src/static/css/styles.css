@@ -326,22 +326,6 @@ main > h1::after {
   background: var(--bg-tertiary);
 }
 
-/* Left accent stripe on hover */
-.project-grid article::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity 0.2s var(--ease-out);
-}
-
-.project-grid article:hover::before {
-  opacity: 1;
-}
 
 .project-grid article header {
   border: none;
@@ -566,7 +550,6 @@ tr {
 
 tbody tr:hover {
   background: var(--bg-secondary);
-  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 tr[data-href] {
