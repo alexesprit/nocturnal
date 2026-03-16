@@ -1,6 +1,38 @@
 {% extends "layout.html" %}
 
 {% block content %}
+<section class="orchestrator-status">
+    <h2>Orchestrator</h2>
+    <dl class="orchestrator-dl">
+        <dt>Last Project</dt>
+        <dd>{% if let Some(current) = orchestrator.current_project %}{{ current }}{% else %}-{% endif %}</dd>
+        <dt>Next Project</dt>
+        <dd>{% if let Some(next) = orchestrator.next_project %}{{ next }}{% else %}-{% endif %}</dd>
+    </dl>
+    {% if !orchestrator.recent_logs.is_empty() %}
+    <h3>Recent Activity</h3>
+    <table class="recent-logs-table">
+        <thead>
+            <tr>
+                <th>Command</th>
+                <th>Task</th>
+                <th>Started</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in orchestrator.recent_logs %}
+            <tr>
+                <td>{{ entry.command }}</td>
+                <td><code>{{ entry.task_id }}</code></td>
+                <td>{{ entry.started }}</td>
+                <td>{{ entry.duration }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</section>
 {% if projects.is_empty() %}
 <p>No projects configured.</p>
 {% else %}
@@ -8,7 +40,12 @@
     {% for project in projects %}
     <article data-href="/projects/{{ project.name }}">
         <header>
-            <h3>{{ project.name }}</h3>
+            <h3>
+                {{ project.name }}
+                {% if let Some(noc) = project.noc %}
+                <span class="badge badge-noc badge-noc-{{ noc.lock_status_css }}">{{ noc.lock_status_label }}</span>
+                {% endif %}
+            </h3>
             <p><small>{{ project.path }}</small></p>
         </header>
         {% if let Some(err) = project.error %}
@@ -24,6 +61,35 @@
             <dt>Review</dt>
             <dd>{{ project.counts.in_review }}</dd>
         </dl>
+        {% if let Some(noc) = project.noc %}
+        {% if noc.counts.implementing > 0 || noc.counts.reviewing > 0 || noc.counts.proposal_pending > 0 || noc.counts.proposal_ready > 0 || !noc.worktree_task_ids.is_empty() %}
+        <div class="noc-status">
+            {% if noc.counts.implementing > 0 || noc.counts.reviewing > 0 || noc.counts.proposal_pending > 0 || noc.counts.proposal_ready > 0 %}
+            <dl class="noc-counts">
+                {% if noc.counts.implementing > 0 %}
+                <dt>Impl</dt>
+                <dd>{{ noc.counts.implementing }}</dd>
+                {% endif %}
+                {% if noc.counts.reviewing > 0 %}
+                <dt>Review</dt>
+                <dd>{{ noc.counts.reviewing }}</dd>
+                {% endif %}
+                {% if noc.counts.proposal_pending > 0 %}
+                <dt>Prop</dt>
+                <dd>{{ noc.counts.proposal_pending }}</dd>
+                {% endif %}
+                {% if noc.counts.proposal_ready > 0 %}
+                <dt>Ready</dt>
+                <dd>{{ noc.counts.proposal_ready }}</dd>
+                {% endif %}
+            </dl>
+            {% endif %}
+            {% if !noc.worktree_task_ids.is_empty() %}
+            <small>Worktrees: {{ noc.worktree_count }}</small>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
         <p>
             Total open: <strong>{{ project.total }}</strong>
         </p>

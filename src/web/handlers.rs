@@ -8,7 +8,11 @@ use serde::Deserialize;
 use tracing::{error, warn};
 
 use super::AppState;
-use super::models::{IssueDetail, ListOpts, ProjectStatus, StatusCounts};
+use super::models::{
+    IssueDetail, ListOpts, LockStatus, NocBadge, NocIssueState, NocProjectStatus, NocTaskCounts,
+    OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
+};
+use crate::config;
 use crate::td::Task;
 
 // --- Validation allowlists ---
@@ -55,6 +59,7 @@ struct DashboardTemplate {
     title: String,
     breadcrumbs: Vec<Breadcrumb>,
     projects: Vec<ProjectStatus>,
+    orchestrator: OrchestratorStatus,
 }
 
 #[derive(Template)]
@@ -81,6 +86,7 @@ struct IssueTemplate {
     breadcrumbs: Vec<Breadcrumb>,
     project_name: String,
     issue: IssueDetail,
+    noc_state: Option<NocIssueState>,
 }
 
 #[derive(Template)]
@@ -127,15 +133,25 @@ pub struct IssueFilterParams {
 // --- Handlers ---
 
 pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
+    let lock_dir = state.lock_dir.clone();
+    let log_dir = state.log_dir.clone();
+    let max_reviews = state.max_reviews;
+    let rotation_state_file = state.rotation_state_file.clone();
+    let project_paths: Vec<(String, String)> = state
+        .projects
+        .iter()
+        .map(|p| (p.name.clone(), p.path.clone()))
+        .collect();
+
     let mut handles = Vec::new();
 
     for entry in &state.projects {
         let td_binary = state.td_binary.clone();
         let path = entry.path.clone();
         let name = entry.name.clone();
-
+        let lock_dir = lock_dir.clone();
         handles.push(tokio::task::spawn_blocking(move || {
-            fetch_project_status(&td_binary, &name, &path)
+            fetch_project_status(&td_binary, &name, &path, &lock_dir, max_reviews)
         }));
     }
 
@@ -152,16 +168,25 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
         }
     }
 
+    let orchestrator = fetch_orchestrator_status(&rotation_state_file, &log_dir, &project_paths);
+
     let tmpl = DashboardTemplate {
         title: "Dashboard".to_string(),
         breadcrumbs: vec![],
         projects,
+        orchestrator,
     };
 
     into_html_response(tmpl)
 }
 
-fn fetch_project_status(td_binary: &str, name: &str, path: &str) -> ProjectStatus {
+fn fetch_project_status(
+    td_binary: &str,
+    name: &str,
+    path: &str,
+    lock_dir: &str,
+    _max_reviews: u32,
+) -> ProjectStatus {
     let result = std::process::Command::new(td_binary)
         .args(["-w", path, "list", "--json", "--all"])
         .output();
@@ -169,9 +194,17 @@ fn fetch_project_status(td_binary: &str, name: &str, path: &str) -> ProjectStatu
     match result {
         Ok(output) if output.status.success() => {
             let json = String::from_utf8_lossy(&output.stdout);
-            let tasks: Vec<Task> = serde_json::from_str(&json).unwrap_or_default();
+            let tasks: Vec<Task> = match serde_json::from_str(&json) {
+                Ok(t) => t,
+                Err(e) => {
+                    warn!("failed to parse td output for {name}: {e}");
+                    Vec::new()
+                }
+            };
 
             let mut counts = StatusCounts::default();
+            let mut noc_counts = NocTaskCounts::default();
+
             for task in &tasks {
                 match task.status.as_str() {
                     "open" => counts.open += 1,
@@ -180,8 +213,42 @@ fn fetch_project_status(td_binary: &str, name: &str, path: &str) -> ProjectStatu
                     "in_review" => counts.in_review += 1,
                     _ => {}
                 }
+
+                let has_noc_reviews = task.labels.iter().any(|l| l.starts_with("noc-reviews:"));
+                let has_proposal = task.labels.iter().any(|l| l.starts_with("noc-proposal:"));
+                let has_proposal_ready = task.labels.iter().any(|l| l == "noc-proposal-ready");
+
+                if has_proposal_ready {
+                    noc_counts.proposal_ready += 1;
+                } else if has_proposal {
+                    noc_counts.proposal_pending += 1;
+                } else if has_noc_reviews {
+                    match task.status.as_str() {
+                        "in_progress" => noc_counts.implementing += 1,
+                        "in_review" => noc_counts.reviewing += 1,
+                        _ => {}
+                    }
+                }
             }
+
             let total = counts.open + counts.in_progress + counts.blocked + counts.in_review;
+
+            let worktree_task_ids = collect_worktree_task_ids(path);
+            let slug = config::project_slug(path);
+            let lock_status = check_lock_status(lock_dir, &slug);
+
+            let lock_status_label = lock_status.label().to_string();
+            let lock_status_css = lock_status.css_class().to_string();
+            let worktree_count = worktree_task_ids.len();
+
+            let noc = Some(NocProjectStatus {
+                worktree_task_ids,
+                worktree_count,
+                lock_status,
+                lock_status_label,
+                lock_status_css,
+                counts: noc_counts,
+            });
 
             ProjectStatus {
                 name: name.to_string(),
@@ -189,6 +256,7 @@ fn fetch_project_status(td_binary: &str, name: &str, path: &str) -> ProjectStatu
                 counts,
                 total,
                 error: None,
+                noc,
             }
         }
         Ok(output) => {
@@ -200,6 +268,7 @@ fn fetch_project_status(td_binary: &str, name: &str, path: &str) -> ProjectStatu
                 counts: StatusCounts::default(),
                 total: 0,
                 error: Some(stderr.trim().to_string()),
+                noc: None,
             }
         }
         Err(e) => {
@@ -210,9 +279,328 @@ fn fetch_project_status(td_binary: &str, name: &str, path: &str) -> ProjectStatu
                 counts: StatusCounts::default(),
                 total: 0,
                 error: Some(format!("failed to run td: {e}")),
+                noc: None,
             }
         }
     }
+}
+
+fn collect_worktree_task_ids(project_path: &str) -> Vec<String> {
+    let output = match std::process::Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .current_dir(project_path)
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return Vec::new(),
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut task_ids = Vec::new();
+
+    for line in stdout.lines() {
+        if let Some(branch_ref) = line.strip_prefix("branch refs/heads/nocturnal/") {
+            task_ids.push(branch_ref.to_string());
+        }
+    }
+
+    task_ids
+}
+
+fn check_lock_status(lock_dir: &str, slug: &str) -> LockStatus {
+    let lock_path = std::path::PathBuf::from(lock_dir).join(format!("nocturnal.run-{slug}.lock"));
+
+    if !lock_path.is_dir() {
+        return LockStatus::Idle;
+    }
+
+    let pid_file = lock_path.join("pid");
+    let pid_str = match std::fs::read_to_string(&pid_file) {
+        Ok(s) => s,
+        Err(_) => return LockStatus::Stale,
+    };
+
+    let pid: u32 = match pid_str.trim().parse() {
+        Ok(p) => p,
+        Err(_) => return LockStatus::Stale,
+    };
+
+    if is_process_alive(pid) {
+        LockStatus::Running(pid)
+    } else {
+        LockStatus::Stale
+    }
+}
+
+fn is_process_alive(pid: u32) -> bool {
+    std::process::Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+fn format_system_time(t: std::time::SystemTime) -> String {
+    let dt: chrono::DateTime<chrono::Local> = t.into();
+    dt.format("%b %-d, %Y %H:%M").to_string()
+}
+
+fn fetch_orchestrator_status(
+    rotation_state_file: &str,
+    log_dir: &str,
+    projects: &[(String, String)],
+) -> OrchestratorStatus {
+    let (current_project, next_project) = read_rotation_state(rotation_state_file, projects);
+
+    let recent_logs = scan_recent_logs(log_dir, 5);
+
+    OrchestratorStatus {
+        current_project,
+        next_project,
+        recent_logs,
+    }
+}
+
+fn read_rotation_state(
+    rotation_state_file: &str,
+    projects: &[(String, String)],
+) -> (Option<String>, Option<String>) {
+    if projects.is_empty() {
+        return (None, None);
+    }
+
+    let last_idx: Option<usize> = std::fs::read_to_string(rotation_state_file)
+        .ok()
+        .and_then(|s| s.trim().parse().ok());
+
+    match last_idx {
+        Some(idx) if idx < projects.len() => {
+            let current = projects[idx].0.clone();
+            let next_idx = (idx + 1) % projects.len();
+            let next = projects[next_idx].0.clone();
+            (Some(current), Some(next))
+        }
+        _ => (None, Some(projects[0].0.clone())),
+    }
+}
+
+fn scan_recent_logs(log_dir: &str, limit: usize) -> Vec<RecentLogEntry> {
+    let dir = match std::fs::read_dir(log_dir) {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut entries: Vec<(std::time::SystemTime, RecentLogEntry)> = Vec::new();
+
+    for entry in dir.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy().to_string();
+
+        if !name_str.ends_with(".log") {
+            continue;
+        }
+
+        let stem = &name_str[..name_str.len() - 4];
+
+        // Actual format: <command>-<task-id>-<YYYYMMDD-HHMMSS>
+        // where command = "implement", "review", or "proposal-review"
+        // and task-id can contain hyphens (e.g. "td-8f756d")
+        // Timestamp is always YYYYMMDD-HHMMSS (15 chars with the dash)
+        //
+        // Parse from the right: last 15 chars = timestamp, then find command prefix
+        if stem.len() < 17 {
+            // minimum: "x-y-YYYYMMDD-HHMMSS"
+            continue;
+        }
+
+        // Timestamp is the last 15 chars (YYYYMMDD-HHMMSS)
+        let ts_start = stem.len() - 15;
+        // There should be a '-' before the timestamp
+        if ts_start == 0 || stem.as_bytes()[ts_start - 1] != b'-' {
+            continue;
+        }
+
+        let timestamp_str = &stem[ts_start..];
+        let prefix = &stem[..ts_start - 1]; // everything before the timestamp dash
+
+        // prefix = "<command>-<task-id>"
+        // Known commands: "implement", "review", "proposal-review"
+        let (command, task_id) = if let Some(rest) = prefix.strip_prefix("proposal-review-") {
+            ("proposal-review", rest)
+        } else if let Some(rest) = prefix.strip_prefix("implement-") {
+            ("implement", rest)
+        } else if let Some(rest) = prefix.strip_prefix("review-") {
+            ("review", rest)
+        } else {
+            continue;
+        };
+
+        let meta = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        let mtime = match meta.modified() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+
+        let started =
+            format_timestamp_str(timestamp_str).unwrap_or_else(|| format_system_time(mtime));
+
+        // Compute duration from filename timestamp to mtime (file last written = end time)
+        let duration_str = parse_timestamp_as_system_time(timestamp_str)
+            .and_then(|start| mtime.duration_since(start).ok())
+            .map(format_duration)
+            .unwrap_or_default();
+
+        entries.push((
+            mtime,
+            RecentLogEntry {
+                command: command.to_string(),
+                task_id: task_id.to_string(),
+                started,
+                duration: duration_str,
+            },
+        ));
+    }
+
+    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.truncate(limit);
+    entries.into_iter().map(|(_, e)| e).collect()
+}
+
+fn format_timestamp_str(ts: &str) -> Option<String> {
+    // Try to parse YYYYMMDD-HHMMSS format (15 chars with dash)
+    if ts.len() == 15 && ts.as_bytes()[8] == b'-' {
+        let dt = chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d-%H%M%S").ok()?;
+        return Some(dt.format("%b %-d, %Y %H:%M").to_string());
+    }
+    // Fallback: try YYYYMMDDHHMMSS (14 chars, no dash)
+    if ts.len() == 14 {
+        let dt = chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d%H%M%S").ok()?;
+        return Some(dt.format("%b %-d, %Y %H:%M").to_string());
+    }
+    None
+}
+
+fn parse_timestamp_as_system_time(ts: &str) -> Option<std::time::SystemTime> {
+    let naive = if ts.len() == 15 && ts.as_bytes()[8] == b'-' {
+        chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d-%H%M%S").ok()?
+    } else if ts.len() == 14 {
+        chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d%H%M%S").ok()?
+    } else {
+        return None;
+    };
+    let local = naive.and_local_timezone(chrono::Local).single()?;
+    Some(local.into())
+}
+
+fn format_duration(d: std::time::Duration) -> String {
+    let secs = d.as_secs();
+    if secs < 60 {
+        format!("{secs}s")
+    } else if secs < 3600 {
+        format!("{}m {}s", secs / 60, secs % 60)
+    } else {
+        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+    }
+}
+
+fn derive_noc_state(
+    labels: &[String],
+    status: &str,
+    max_reviews: u32,
+    project_path: &str,
+    issue_id: &str,
+) -> Option<NocIssueState> {
+    let review_count = labels.iter().find_map(|l| {
+        l.strip_prefix("noc-reviews:")
+            .and_then(|n| n.parse::<u32>().ok())
+    });
+
+    let badge;
+    let review_cycle;
+
+    if let Some(n) = review_count {
+        review_cycle = Some(n);
+        if n >= max_reviews {
+            badge = NocBadge {
+                text: "blocked (max reviews)".to_string(),
+                css_class: "blocked".to_string(),
+            };
+        } else {
+            match status {
+                "in_progress" => {
+                    badge = NocBadge {
+                        text: "implementing".to_string(),
+                        css_class: "implementing".to_string(),
+                    };
+                }
+                "in_review" => {
+                    badge = NocBadge {
+                        text: "noc reviewing".to_string(),
+                        css_class: "reviewing".to_string(),
+                    };
+                }
+                _ => return None,
+            }
+        }
+    } else if labels.iter().any(|l| l == "noc-proposal-ready") {
+        review_cycle = None;
+        badge = NocBadge {
+            text: "proposal ready".to_string(),
+            css_class: "proposal-ready".to_string(),
+        };
+    } else if labels.iter().any(|l| l.starts_with("noc-proposal:")) {
+        review_cycle = None;
+        badge = NocBadge {
+            text: "proposal pending".to_string(),
+            css_class: "proposal-pending".to_string(),
+        };
+    } else {
+        return None;
+    }
+
+    // Find worktree for this task
+    let (worktree_path, worktree_branch) = find_worktree_for_task(project_path, issue_id);
+
+    Some(NocIssueState {
+        badge,
+        review_cycle,
+        max_reviews,
+        worktree_path,
+        worktree_branch,
+    })
+}
+
+fn find_worktree_for_task(project_path: &str, task_id: &str) -> (Option<String>, Option<String>) {
+    let output = match std::process::Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .current_dir(project_path)
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return (None, None),
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let target_ref = format!("refs/heads/nocturnal/{task_id}");
+
+    let mut current_path: Option<String> = None;
+    for line in stdout.lines() {
+        if let Some(path) = line.strip_prefix("worktree ") {
+            current_path = Some(path.to_string());
+        } else if let Some(branch_ref) = line.strip_prefix("branch ") {
+            if branch_ref == target_ref {
+                let branch = format!("nocturnal/{task_id}");
+                return (current_path, Some(branch));
+            }
+        }
+    }
+
+    (None, None)
 }
 
 pub async fn project(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> Response {
@@ -369,12 +757,23 @@ pub async fn issue(
     let path = entry.path.clone();
     let project_name = name.clone();
     let issue_id = id.clone();
+    let max_reviews = state.max_reviews;
 
-    let result =
-        tokio::task::spawn_blocking(move || run_td_show(&td_binary, &path, &issue_id)).await;
+    let result = tokio::task::spawn_blocking(move || {
+        let detail = run_td_show(&td_binary, &path, &issue_id)?;
+        let noc_state = derive_noc_state(
+            &detail.labels,
+            &detail.status,
+            max_reviews,
+            &path,
+            &issue_id,
+        );
+        Ok::<_, anyhow::Error>((detail, noc_state))
+    })
+    .await;
 
     match result {
-        Ok(Ok(detail)) => {
+        Ok(Ok((detail, noc_state))) => {
             let tmpl = IssueTemplate {
                 title: format!("{} — {}", detail.id, detail.title),
                 breadcrumbs: vec![
@@ -389,6 +788,7 @@ pub async fn issue(
                 ],
                 project_name,
                 issue: detail,
+                noc_state,
             };
             into_html_response(tmpl)
         }

@@ -7,6 +7,9 @@
         <small>{{ issue.id }}</small>
         <span class="badge badge-status badge-status-{{ issue.status }}">{{ issue.status }}</span>
         <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
+        {% if let Some(noc) = noc_state %}
+        <span class="badge badge-noc badge-noc-{{ noc.badge.css_class }}">{{ noc.badge.text }}</span>
+        {% endif %}
         <span>{{ issue.issue_type }}</span>
     </p>
 </header>
@@ -40,6 +43,20 @@
         {% if !issue.due_date.is_empty() %}
         <dt>Due Date</dt>
         <dd>{{ issue.due_date|format_date }}</dd>
+        {% endif %}
+        {% if let Some(noc) = noc_state %}
+        {% if let Some(cycle) = noc.review_cycle %}
+        <dt>Review Cycle</dt>
+        <dd>{{ cycle }} / {{ noc.max_reviews }}</dd>
+        {% endif %}
+        {% if let Some(wt_branch) = noc.worktree_branch %}
+        <dt>Worktree Branch</dt>
+        <dd><code>{{ wt_branch }}</code></dd>
+        {% endif %}
+        {% if let Some(wt_path) = noc.worktree_path %}
+        <dt>Worktree Path</dt>
+        <dd><code>{{ wt_path }}</code></dd>
+        {% endif %}
         {% endif %}
     </dl>
 </section>
