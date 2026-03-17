@@ -1,5 +1,7 @@
 default: lint
 
+ci: build lint
+
 lint: fmt check audit
 
 fmt:
