@@ -9,7 +9,7 @@ use crate::project_config::{self, VcsMode};
 #[derive(Clone)]
 pub struct Config {
     pub max_reviews: u32,
-    pub max_budget: u32,
+    pub max_budget: Option<u32>,
     pub model: String,
     pub lock_dir: String,
     pub log_dir: String,
@@ -59,7 +59,9 @@ impl Config {
 
         Config {
             max_reviews: env_u32("NOCTURNAL_MAX_REVIEWS", 3),
-            max_budget: env_u32("NOCTURNAL_MAX_BUDGET", 5),
+            max_budget: env::var("NOCTURNAL_MAX_BUDGET")
+                .ok()
+                .and_then(|v| v.parse().ok()),
             model: env::var("NOCTURNAL_MODEL").unwrap_or_else(|_| "sonnet".to_string()),
             lock_dir: env::var("NOCTURNAL_LOCK_DIR").unwrap_or_else(|_| tmpdir.clone()),
             log_dir: env::var("NOCTURNAL_LOG_DIR")

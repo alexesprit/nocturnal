@@ -52,10 +52,13 @@ pub fn run(
 ) -> Result<bool> {
     fs::create_dir_all(&ctx.cfg.log_dir).ok();
 
-    info!(
-        "Running Claude (model={}, budget=${})...",
-        ctx.cfg.model, ctx.cfg.max_budget
-    );
+    match ctx.cfg.max_budget {
+        Some(b) => info!("Running Claude (model={}, budget=${b})...", ctx.cfg.model),
+        None => info!(
+            "Running Claude (model={}, budget=unlimited)...",
+            ctx.cfg.model
+        ),
+    }
     info!("Log: {log_file}");
 
     let started_at = chrono::Local::now();
@@ -64,16 +67,22 @@ pub fn run(
     let output_file = fs::File::create(log_file).context("Failed to create log file")?;
     let stderr_file = output_file.try_clone()?;
 
+    let mut args = vec![
+        "-p",
+        "--dangerously-skip-permissions",
+        "--model",
+        &ctx.cfg.model,
+    ];
+    let budget_str;
+    if let Some(b) = ctx.cfg.max_budget {
+        budget_str = b.to_string();
+        args.push("--max-budget-usd");
+        args.push(&budget_str);
+    }
+    args.push(prompt);
+
     let status = Command::new("claude")
-        .args([
-            "-p",
-            "--dangerously-skip-permissions",
-            "--model",
-            &ctx.cfg.model,
-            "--max-budget-usd",
-            &ctx.cfg.max_budget.to_string(),
-            prompt,
-        ])
+        .args(&args)
         .current_dir(wt_path)
         .stdout(output_file)
         .stderr(stderr_file)
