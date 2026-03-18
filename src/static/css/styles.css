@@ -1111,7 +1111,8 @@ main > section:nth-of-type(4) { animation-delay: 0.25s; }
 /* ============================================
    HTMX loading indicator
    ============================================ */
-.htmx-request ~ table #issue-table-body {
+.htmx-request ~ table #issue-table-body,
+.htmx-request ~ #content-panel {
   opacity: 0.4;
   transition: opacity 0.2s;
 }
@@ -1178,6 +1179,25 @@ main > section:nth-of-type(4) { animation-delay: 0.25s; }
   th, td {
     padding: 0.5rem;
   }
+
+  .filters-bar {
+    flex-direction: column;
+  }
+
+  .view-toggle {
+    align-self: flex-start;
+  }
+
+  .kanban-board {
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .kanban-column {
+    min-width: 0;
+    flex: none;
+    width: 100%;
+  }
 }
 
 /* ============================================
@@ -1186,6 +1206,165 @@ main > section:nth-of-type(4) { animation-delay: 0.25s; }
 ::selection {
   background: var(--accent);
   color: var(--text-inverse);
+}
+
+/* ============================================
+   View Toggle (Table / Kanban)
+   ============================================ */
+.filters-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.filters-bar form {
+  flex: 1;
+  min-width: 0;
+}
+
+.filters-bar form fieldset[role="group"] {
+  margin-bottom: 0;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.view-btn {
+  background: none;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+  white-space: nowrap;
+}
+
+.view-btn:last-child {
+  border-right: none;
+}
+
+.view-btn:hover {
+  color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
+.view-btn-active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* ============================================
+   Kanban Board
+   ============================================ */
+.kanban-board {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  align-items: flex-start;
+  padding-bottom: 0.5rem;
+}
+
+.kanban-column {
+  min-width: 200px;
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  gap: 0.5rem;
+}
+
+.kanban-column-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.kanban-count {
+  font-size: 0.65rem;
+  border-left-width: 2px;
+}
+
+.kanban-card {
+  display: block;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.1s var(--ease-out);
+}
+
+.kanban-card:last-child {
+  border-bottom: none;
+}
+
+.kanban-card:hover {
+  background: var(--bg-tertiary);
+}
+
+.kanban-card-id {
+  margin-bottom: 0.3rem;
+}
+
+.kanban-card-id code {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  padding: 0.1em 0.3em;
+  border: 1px solid var(--border);
+}
+
+.kanban-card-title {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.35;
+  margin-bottom: 0.5rem;
+}
+
+.kanban-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.kanban-card-type {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kanban-card-labels {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+
+.kanban-empty {
+  padding: 1.25rem 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  text-align: center;
 }
 
 /* ============================================
