@@ -43,6 +43,8 @@ enum Command {
     Review,
     /// Check open proposals for review comments and address them
     ProposalReview,
+    /// Cycle through projects and run proposal-review for the first project with open proposals
+    ProposalReviewRotate,
     /// Process one project per tick, cycling through the project list
     Rotate,
     /// Run 'run' for every project in the project list (same tick)
@@ -82,6 +84,7 @@ fn run(cli: Cli) -> Result<()> {
 
     match command {
         Command::Rotate => commands::rotate::run(&cfg),
+        Command::ProposalReviewRotate => commands::proposal_review_rotate::run(&cfg),
         Command::Foreach => commands::foreach::run(&cfg),
         Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
         _ => {
@@ -97,7 +100,10 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Implement => commands::implement::run(&ctx),
                 Command::Review => commands::review::run(&ctx),
                 Command::ProposalReview => commands::proposal_review::run(&ctx),
-                Command::Rotate | Command::Foreach | Command::Web { .. } => unreachable!(),
+                Command::Rotate
+                | Command::ProposalReviewRotate
+                | Command::Foreach
+                | Command::Web { .. } => unreachable!(),
             }
         }
     }
