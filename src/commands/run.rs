@@ -36,7 +36,12 @@ pub fn run_inner(ctx: &ProjectContext) -> Result<bool> {
             info!("No reviewable tasks, implementing next ({task_id})");
             super::implement::run_unlocked(ctx)?;
         }
-        NextAction::Idle => return Ok(false),
+        NextAction::Idle => {
+            if ctx.cfg.dry_run {
+                info!("dry-run: nothing to do (no reviewable or open tasks)");
+            }
+            return Ok(false);
+        }
     }
 
     Ok(true)

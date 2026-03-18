@@ -44,6 +44,12 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         return Ok(());
     }
 
+    if ctx.cfg.dry_run {
+        info!("dry-run: would invoke Claude for review of task {task_id}");
+        info!("dry-run: would update task state based on review outcome");
+        return Ok(());
+    }
+
     let wt_path = git::worktree_path(&ctx.project_root, &task_id)?.ok_or_else(|| {
         anyhow::anyhow!(
             "No worktree found for {task_id} — expected branch {}",

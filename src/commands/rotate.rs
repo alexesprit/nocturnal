@@ -59,6 +59,11 @@ pub fn run(cfg: &Config) -> Result<()> {
 
         let ctx = ProjectContext::new(cfg.clone(), project_root.clone());
 
+        if cfg.dry_run {
+            info!("dry-run: would process project {project_root}");
+            return Ok(());
+        }
+
         match super::run::run_inner(&ctx) {
             Ok(true) => return Ok(()),
             Ok(false) => {

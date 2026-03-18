@@ -24,6 +24,10 @@ struct Cli {
     #[arg(long = "project", global = true)]
     project: Option<String>,
 
+    /// Show what would happen without invoking Claude or mutating task state
+    #[arg(long, global = true)]
+    dry_run: bool,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -71,7 +75,8 @@ fn main() {
 }
 
 fn run(cli: Cli) -> Result<()> {
-    let cfg = config::Config::from_env();
+    let mut cfg = config::Config::from_env();
+    cfg.dry_run = cli.dry_run;
     let command = cli.command.unwrap_or(Command::Run);
 
     match command {

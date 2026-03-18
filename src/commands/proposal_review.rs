@@ -26,6 +26,11 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
     for task_id in task_ids {
         info!("=== Checking proposal for task: {task_id} ===");
 
+        if ctx.cfg.dry_run {
+            info!("dry-run: would invoke Claude for proposal-review of task {task_id}");
+            return Ok(());
+        }
+
         let task = td_client.show(&task_id)?;
         let proposal_id = task
             .labels

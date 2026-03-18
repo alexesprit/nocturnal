@@ -12,6 +12,7 @@ pub struct Config {
     pub log_dir: String,
     pub projects_file: String,
     pub rotation_state_file: String,
+    pub dry_run: bool,
 }
 
 pub struct ProjectContext {
@@ -68,6 +69,7 @@ impl Config {
                 .unwrap_or_else(|_| format!("{home}/.config/nocturnal/projects")),
             rotation_state_file: env::var("NOCTURNAL_ROTATION_STATE")
                 .unwrap_or_else(|_| format!("{home}/.config/nocturnal/rotation-state")),
+            dry_run: false,
         }
     }
 

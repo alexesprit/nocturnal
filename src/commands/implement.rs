@@ -30,6 +30,13 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         return Ok(());
     }
 
+    if ctx.cfg.dry_run {
+        info!("dry-run: would create worktree for task {task_id}");
+        info!("dry-run: would invoke Claude for implement of task {task_id}");
+        info!("dry-run: would submit task {task_id} for review");
+        return Ok(());
+    }
+
     let wt_path = git::ensure_worktree(&ctx.project_root, &task_id)?;
     info!("Worktree: {wt_path}");
 
