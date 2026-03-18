@@ -443,6 +443,38 @@ fn format_duration_secs(secs: u64) -> String {
     }
 }
 
+fn build_proposal_url(project_path: &str, proposal_id: &str) -> Option<(String, String)> {
+    let remote = crate::git::remote_url(project_path)?;
+    let base_url = parse_remote_to_https_base(&remote)?;
+
+    if remote.contains("github") {
+        let url = format!("{base_url}/pull/{proposal_id}");
+        let label = format!("PR #{proposal_id}");
+        Some((url, label))
+    } else if remote.contains("gitlab") {
+        let url = format!("{base_url}/-/merge_requests/{proposal_id}");
+        let label = format!("MR #{proposal_id}");
+        Some((url, label))
+    } else {
+        None
+    }
+}
+
+fn parse_remote_to_https_base(remote: &str) -> Option<String> {
+    // SSH: git@github.com:owner/repo.git
+    if let Some(rest) = remote.strip_prefix("git@") {
+        let (host, path) = rest.split_once(':')?;
+        let path = path.trim_end_matches(".git");
+        return Some(format!("https://{host}/{path}"));
+    }
+    // HTTPS: https://github.com/owner/repo.git
+    if remote.starts_with("https://") || remote.starts_with("http://") {
+        let url = remote.trim_end_matches(".git");
+        return Some(url.to_string());
+    }
+    None
+}
+
 fn derive_noc_state(
     labels: &[String],
     status: &str,
@@ -507,12 +539,22 @@ fn derive_noc_state(
     // Find worktree for this task
     let (worktree_path, worktree_branch) = find_worktree_for_task(project_path, issue_id);
 
+    // Build proposal URL if a proposal label exists
+    let (proposal_url, proposal_label) = labels
+        .iter()
+        .find_map(|l| l.strip_prefix("noc-proposal:").map(|id| id.to_string()))
+        .and_then(|id| build_proposal_url(project_path, &id))
+        .map(|(url, label)| (Some(url), Some(label)))
+        .unwrap_or((None, None));
+
     Some(NocIssueState {
         badge,
         review_cycle,
         max_reviews,
         worktree_path,
         worktree_branch,
+        proposal_url,
+        proposal_label,
     })
 }
 
