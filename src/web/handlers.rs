@@ -224,9 +224,9 @@ fn fetch_project_status(
                 let has_proposal = task.labels.iter().any(|l| l.starts_with("noc-proposal:"));
                 let has_proposal_ready = task.labels.iter().any(|l| l == "noc-proposal-ready");
 
-                if has_proposal_ready {
+                if has_proposal_ready && task.status != "closed" {
                     noc_counts.proposal_ready += 1;
-                } else if has_proposal {
+                } else if has_proposal && task.status != "closed" {
                     noc_counts.proposal_pending += 1;
                 } else if has_noc_reviews {
                     match task.status.as_str() {
