@@ -808,6 +808,53 @@ main > section > article pre {
 }
 
 /* ============================================
+   Copy Button
+   ============================================ */
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  transition: color 0.15s var(--ease-out);
+  line-height: 0;
+}
+
+.copy-btn:hover {
+  color: var(--accent);
+}
+
+.copy-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.copy-btn .copy-check {
+  display: none;
+}
+
+.copy-btn.copy-btn-copied {
+  color: var(--status-open);
+}
+
+.copy-btn.copy-btn-copied .copy-icon {
+  display: none;
+}
+
+.copy-btn.copy-btn-copied .copy-check {
+  display: inline;
+}
+
+/* ============================================
    Nocturnal Badges
    ============================================ */
 .badge-noc {
