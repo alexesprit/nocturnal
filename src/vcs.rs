@@ -1,8 +1,24 @@
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 
 use crate::project_config::VcsMode;
+
+fn retry<F, T>(f: F) -> Result<T>
+where
+    F: Fn() -> Result<T>,
+{
+    match f() {
+        Ok(val) => Ok(val),
+        Err(err) => {
+            tracing::warn!("VCS command failed, retrying in 3s: {err}");
+            thread::sleep(Duration::from_secs(3));
+            f()
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Platform {
@@ -48,7 +64,7 @@ pub fn create_proposal(
     title: &str,
     description: &str,
 ) -> Result<Proposal> {
-    match platform {
+    retry(|| match platform {
         Platform::GitLab => {
             let output = Command::new("glab")
                 .args([
@@ -116,25 +132,32 @@ pub fn create_proposal(
             let id = extract_trailing_number(&url)?;
             Ok(Proposal { id, url })
         }
-    }
+    })
 }
 
 pub fn enable_auto_merge(platform: Platform, wt_path: &str, proposal_id: &str) -> bool {
-    let status = match platform {
-        Platform::GitLab => Command::new("glab")
-            .args(["mr", "merge", proposal_id, "--auto", "--yes"])
-            .current_dir(wt_path)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status(),
-        Platform::GitHub => Command::new("gh")
-            .args(["pr", "merge", proposal_id, "--auto", "--squash"])
-            .current_dir(wt_path)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status(),
-    };
-    status.is_ok_and(|s| s.success())
+    retry(|| {
+        let status = match platform {
+            Platform::GitLab => Command::new("glab")
+                .args(["mr", "merge", proposal_id, "--auto", "--yes"])
+                .current_dir(wt_path)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status(),
+            Platform::GitHub => Command::new("gh")
+                .args(["pr", "merge", proposal_id, "--auto", "--squash"])
+                .current_dir(wt_path)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status(),
+        };
+        match status {
+            Ok(s) if s.success() => Ok(()),
+            Ok(s) => bail!("auto-merge command exited with status {s}"),
+            Err(e) => Err(anyhow::Error::from(e)),
+        }
+    })
+    .is_ok()
 }
 
 #[derive(Debug)]
@@ -149,42 +172,44 @@ pub fn get_proposal_state(
     wt_path: &str,
     proposal_id: &str,
 ) -> Result<ProposalState> {
-    let state_str = match platform {
-        Platform::GitLab => {
-            let output = Command::new("glab")
-                .args(["mr", "view", proposal_id, "-F", "json"])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to view GitLab MR")?;
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                bail!("Failed to view GitLab MR #{proposal_id}: {}", stderr.trim());
+    retry(|| {
+        let state_str = match platform {
+            Platform::GitLab => {
+                let output = Command::new("glab")
+                    .args(["mr", "view", proposal_id, "-F", "json"])
+                    .current_dir(wt_path)
+                    .output()
+                    .context("Failed to view GitLab MR")?;
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    bail!("Failed to view GitLab MR #{proposal_id}: {}", stderr.trim());
+                }
+                let json: serde_json::Value =
+                    serde_json::from_slice(&output.stdout).context("Failed to parse MR JSON")?;
+                json["state"].as_str().unwrap_or("unknown").to_string()
             }
-            let json: serde_json::Value =
-                serde_json::from_slice(&output.stdout).context("Failed to parse MR JSON")?;
-            json["state"].as_str().unwrap_or("unknown").to_string()
-        }
-        Platform::GitHub => {
-            let output = Command::new("gh")
-                .args(["pr", "view", proposal_id, "--json", "state"])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to view GitHub PR")?;
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                bail!("Failed to view GitHub PR #{proposal_id}: {}", stderr.trim());
+            Platform::GitHub => {
+                let output = Command::new("gh")
+                    .args(["pr", "view", proposal_id, "--json", "state"])
+                    .current_dir(wt_path)
+                    .output()
+                    .context("Failed to view GitHub PR")?;
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    bail!("Failed to view GitHub PR #{proposal_id}: {}", stderr.trim());
+                }
+                let json: serde_json::Value =
+                    serde_json::from_slice(&output.stdout).context("Failed to parse PR JSON")?;
+                json["state"].as_str().unwrap_or("unknown").to_string()
             }
-            let json: serde_json::Value =
-                serde_json::from_slice(&output.stdout).context("Failed to parse PR JSON")?;
-            json["state"].as_str().unwrap_or("unknown").to_string()
-        }
-    };
+        };
 
-    match state_str.to_lowercase().as_str() {
-        "merged" => Ok(ProposalState::Merged),
-        "closed" => Ok(ProposalState::Closed),
-        _ => Ok(ProposalState::Open),
-    }
+        match state_str.to_lowercase().as_str() {
+            "merged" => Ok(ProposalState::Merged),
+            "closed" => Ok(ProposalState::Closed),
+            _ => Ok(ProposalState::Open),
+        }
+    })
 }
 
 pub fn fetch_unresolved_comments(
@@ -192,7 +217,7 @@ pub fn fetch_unresolved_comments(
     wt_path: &str,
     proposal_id: &str,
 ) -> Result<String> {
-    match platform {
+    retry(|| match platform {
         Platform::GitLab => {
             let output = Command::new("glab")
                 .args([
@@ -281,7 +306,7 @@ pub fn fetch_unresolved_comments(
 
             Ok(serde_json::to_string_pretty(&comments)?)
         }
-    }
+    })
 }
 
 fn extract_trailing_number(s: &str) -> Result<String> {

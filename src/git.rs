@@ -1,6 +1,22 @@
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
+
+fn retry<F, T>(f: F) -> Result<T>
+where
+    F: Fn() -> Result<T>,
+{
+    match f() {
+        Ok(val) => Ok(val),
+        Err(err) => {
+            tracing::warn!("git command failed, retrying in 3s: {err}");
+            thread::sleep(Duration::from_secs(3));
+            f()
+        }
+    }
+}
 
 const WORKTREE_PREFIX: &str = "nocturnal";
 
@@ -87,16 +103,18 @@ pub fn remote_url(project_root: &str) -> Option<String> {
 }
 
 pub fn push_branch(wt_path: &str, branch: &str) -> Result<()> {
-    let status = Command::new("git")
-        .args(["push", "origin", branch, "--set-upstream"])
-        .current_dir(wt_path)
-        .status()
-        .context("Failed to push branch")?;
+    retry(|| {
+        let status = Command::new("git")
+            .args(["push", "origin", branch, "--set-upstream"])
+            .current_dir(wt_path)
+            .status()
+            .context("Failed to push branch")?;
 
-    if !status.success() {
-        bail!("Failed to push branch {branch}");
-    }
-    Ok(())
+        if !status.success() {
+            bail!("Failed to push branch {branch}");
+        }
+        Ok(())
+    })
 }
 
 pub fn remote_reachable(wt_path: &str) -> bool {
