@@ -57,6 +57,10 @@
         <dt>Worktree Path</dt>
         <dd><code>{{ wt_path }}</code></dd>
         {% endif %}
+        {% if let Some(url) = noc.proposal_url %}
+        <dt>Proposal</dt>
+        <dd><a href="{{ url }}" target="_blank">{{ noc.proposal_label.as_deref().unwrap_or("View") }}</a></dd>
+        {% endif %}
         {% endif %}
     </dl>
 </section>

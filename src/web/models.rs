@@ -138,6 +138,8 @@ pub struct NocIssueState {
     pub max_reviews: u32,
     pub worktree_path: Option<String>,
     pub worktree_branch: Option<String>,
+    pub proposal_url: Option<String>,
+    pub proposal_label: Option<String>,
 }
 
 pub struct OrchestratorStatus {
