@@ -87,7 +87,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
             prompt::Template::ProposalReview,
             &task_id,
             &ctx.project_root,
-            ctx.cfg.max_reviews,
+            ctx.max_reviews,
             &vcs_reply_cmd,
         );
         rendered.push_str(&format!(

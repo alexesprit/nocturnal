@@ -52,11 +52,11 @@ pub fn run(
 ) -> Result<bool> {
     fs::create_dir_all(&ctx.cfg.log_dir).ok();
 
-    match ctx.cfg.max_budget {
-        Some(b) => info!("Running Claude (model={}, budget=${b})...", ctx.cfg.model),
+    match ctx.max_budget {
+        Some(b) => info!("Running Claude (model={}, budget=${b})...", ctx.model),
         None => info!(
             "Running Claude (model={}, budget=unlimited)...",
-            ctx.cfg.model
+            ctx.model
         ),
     }
     info!("Log: {log_file}");
@@ -71,10 +71,10 @@ pub fn run(
         "-p",
         "--dangerously-skip-permissions",
         "--model",
-        &ctx.cfg.model,
+        &ctx.model,
     ];
     let budget_str;
-    if let Some(b) = ctx.cfg.max_budget {
+    if let Some(b) = ctx.max_budget {
         budget_str = b.to_string();
         args.push("--max-budget-usd");
         args.push(&budget_str);

@@ -22,10 +22,10 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
 
     let task = td.show(&task_id)?;
     let review_count = td::get_review_count(&task);
-    if review_count >= ctx.cfg.max_reviews {
+    if review_count >= ctx.max_reviews {
         info!(
             "Task {task_id} has {review_count} review cycles (max {}), skipping",
-            ctx.cfg.max_reviews
+            ctx.max_reviews
         );
         return Ok(());
     }
@@ -39,7 +39,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         prompt::Template::Implement,
         &task_id,
         &ctx.project_root,
-        ctx.cfg.max_reviews,
+        ctx.max_reviews,
     );
 
     let slug = ctx.project_slug();

@@ -135,7 +135,6 @@ pub struct IssueFilterParams {
 pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
     let lock_dir = state.lock_dir.clone();
     let log_dir = state.log_dir.clone();
-    let max_reviews = state.max_reviews;
     let rotation_state_file = state.rotation_state_file.clone();
     let project_paths: Vec<(String, String)> = state
         .projects
@@ -150,6 +149,7 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
         let path = entry.path.clone();
         let name = entry.name.clone();
         let lock_dir = lock_dir.clone();
+        let max_reviews = entry.max_reviews;
         handles.push(tokio::task::spawn_blocking(move || {
             fetch_project_status(&td_binary, &name, &path, &lock_dir, max_reviews)
         }));
@@ -687,7 +687,7 @@ pub async fn issue(
     let path = entry.path.clone();
     let project_name = name.clone();
     let issue_id = id.clone();
-    let max_reviews = state.max_reviews;
+    let max_reviews = entry.max_reviews;
 
     let result = tokio::task::spawn_blocking(move || {
         let detail = run_td_show(&td_binary, &path, &issue_id)?;

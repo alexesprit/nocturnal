@@ -26,17 +26,17 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
 
     let task = td_client.show(&task_id)?;
     let review_count = td::get_review_count(&task);
-    if review_count >= ctx.cfg.max_reviews {
+    if review_count >= ctx.max_reviews {
         info!(
             "Task {task_id} reached max reviews ({review_count}/{})",
-            ctx.cfg.max_reviews
+            ctx.max_reviews
         );
         td_client
             .comment(
                 &task_id,
                 &format!(
                     "Orchestrator: max review cycles reached ({review_count}/{}). Needs human review.",
-                    ctx.cfg.max_reviews
+                    ctx.max_reviews
                 ),
             )
             .ok();
@@ -56,7 +56,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         prompt::Template::Review,
         &task_id,
         &ctx.project_root,
-        ctx.cfg.max_reviews,
+        ctx.max_reviews,
         Some(review_cycle),
     );
 
@@ -86,16 +86,16 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         td_client.update_labels(&task_id, &labels)?;
         info!(
             "Task rejected (review cycle {new_count}/{})",
-            ctx.cfg.max_reviews
+            ctx.max_reviews
         );
 
-        if new_count >= ctx.cfg.max_reviews {
+        if new_count >= ctx.max_reviews {
             td_client
                 .comment(
                     &task_id,
                     &format!(
                         "Orchestrator: max review cycles reached ({new_count}/{}). Needs human review.",
-                        ctx.cfg.max_reviews
+                        ctx.max_reviews
                     ),
                 )
                 .ok();
