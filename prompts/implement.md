@@ -59,10 +59,15 @@ td log --blocker "Pre-existing failure: <description>" -w "{{PROJECT_ROOT}}"
 
 ### 5. Commit
 
-Create a commit with a conventional commit message describing the changes:
+Check recent commits to understand the project's commit message style:
+```bash
+git log --oneline -10 main
+```
+
+Create a commit that matches the existing style:
 ```bash
 git add -A
-git commit -m "<type>(<scope>): <description>"
+git commit -m "<message matching project style>"
 ```
 
 ### 6. Log Progress
