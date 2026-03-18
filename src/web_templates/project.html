@@ -1,6 +1,15 @@
 {% extends "layout.html" %}
 
 {% block content %}
+<div class="project-header">
+    <div class="rotate-controls">
+        <button class="btn-rotate"
+                hx-post="/api/projects/{{ name }}/develop"
+                hx-target="#develop-feedback"
+                hx-swap="innerHTML">Develop now</button>
+        <span id="develop-feedback"></span>
+    </div>
+</div>
 {% include "partials/filters.html" %}
 <table>
     <thead>
