@@ -835,6 +835,53 @@ main > section > article pre {
   margin-bottom: 2rem;
 }
 
+.orchestrator-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.orchestrator-header h2 {
+  margin-bottom: 0;
+}
+
+.rotate-controls {
+  display: flex;
+  align-items: center;
+}
+
+.btn-rotate {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  transition: color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.btn-rotate:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-rotate.htmx-request {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+.rotate-feedback {
+  font-size: 0.82rem;
+}
+
+.rotate-feedback-ok      { color: var(--status-open); }
+.rotate-feedback-running { color: var(--text-secondary); }
+.rotate-feedback-error   { color: var(--status-blocked); }
+
 .orchestrator-status h2 {
   margin-bottom: 0.75rem;
 }

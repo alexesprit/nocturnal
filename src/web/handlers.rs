@@ -820,6 +820,56 @@ fn run_td_show(td_binary: &str, project_path: &str, issue_id: &str) -> anyhow::R
     Ok(detail)
 }
 
+// --- API handlers ---
+
+pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
+    let is_running = state.projects.iter().any(|p| {
+        let slug = crate::config::project_slug(&p.path);
+        matches!(
+            check_lock_status(&state.lock_dir, &slug),
+            LockStatus::Running(_)
+        )
+    });
+
+    if is_running {
+        return Html(
+            r#"<span class="rotate-feedback rotate-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('rotate-feedback');if(f)f.innerHTML='';},4000);</script>"#,
+        )
+        .into_response();
+    }
+
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(e) => {
+            error!("failed to get current exe: {e}");
+            return Html(
+                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
+            )
+            .into_response();
+        }
+    };
+
+    match std::process::Command::new(&exe)
+        .arg("rotate")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(_child) => Html(
+            r#"<span class="rotate-feedback rotate-feedback-ok">Rotation triggered</span><script>setTimeout(function(){var f=document.getElementById('rotate-feedback');if(f)f.innerHTML='';},4000);</script>"#,
+        )
+        .into_response(),
+        Err(e) => {
+            error!("failed to spawn rotate: {e}");
+            Html(
+                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
+            )
+            .into_response()
+        }
+    }
+}
+
 // --- Helpers ---
 
 fn into_html_response<T: Template>(tmpl: T) -> Response {
