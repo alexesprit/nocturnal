@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use rust_embed::Embed;
 
 #[derive(Embed)]
@@ -40,6 +40,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/projects/{name}", get(handlers::project))
         .route("/projects/{name}/issues", get(handlers::project_issues))
         .route("/projects/{name}/issues/{id}", get(handlers::issue))
+        .route("/api/rotate", post(handlers::rotate_now))
         .route("/static/{*path}", get(static_handler))
         .with_state(state)
 }

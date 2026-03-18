@@ -2,7 +2,16 @@
 
 {% block content %}
 <section class="orchestrator-status">
-    <h2>Orchestrator</h2>
+    <div class="orchestrator-header">
+        <h2>Orchestrator</h2>
+        <div class="rotate-controls">
+            <button class="btn-rotate"
+                    hx-post="/api/rotate"
+                    hx-target="#rotate-feedback"
+                    hx-swap="innerHTML">Rotate now</button>
+            <span id="rotate-feedback"></span>
+        </div>
+    </div>
     <dl class="orchestrator-dl">
         <dt>Last Project</dt>
         <dd>{% if let Some(current) = orchestrator.current_project %}<a href="/projects/{{ current }}">{{ current }}</a>{% else %}-{% endif %}</dd>
