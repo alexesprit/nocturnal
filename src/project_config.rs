@@ -118,10 +118,9 @@ mod tests {
 
     #[test]
     fn parse_full_config() {
-        let f: ProjectConfig = toml::from_str(
-            "vcs = \"gitlab\"\nmax_reviews = 5\nmax_budget = 10\nmodel = \"opus\"",
-        )
-        .unwrap();
+        let f: ProjectConfig =
+            toml::from_str("vcs = \"gitlab\"\nmax_reviews = 5\nmax_budget = 10\nmodel = \"opus\"")
+                .unwrap();
         assert_eq!(f.vcs.unwrap(), VcsMode::GitLab);
         assert_eq!(f.max_reviews.unwrap(), 5);
         assert_eq!(f.max_budget.unwrap(), 10);

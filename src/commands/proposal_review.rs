@@ -28,7 +28,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
 
         if ctx.cfg.dry_run {
             info!("dry-run: would invoke Claude for proposal-review of task {task_id}");
-            return Ok(());
+            continue;
         }
 
         let task = td_client.show(&task_id)?;

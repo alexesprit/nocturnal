@@ -55,14 +55,14 @@ pub fn run(cfg: &Config) -> Result<()> {
             }
         };
 
-        fs::write(&cfg.rotation_state_file, idx.to_string()).ok();
-
         let ctx = ProjectContext::new(cfg.clone(), project_root.clone());
 
         if cfg.dry_run {
             info!("dry-run: would process project {project_root}");
             return Ok(());
         }
+
+        fs::write(&cfg.rotation_state_file, idx.to_string()).ok();
 
         match super::run::run_inner(&ctx) {
             Ok(true) => return Ok(()),

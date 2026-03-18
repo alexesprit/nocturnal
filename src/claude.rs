@@ -54,10 +54,7 @@ pub fn run(
 
     match ctx.max_budget {
         Some(b) => info!("Running Claude (model={}, budget=${b})...", ctx.model),
-        None => info!(
-            "Running Claude (model={}, budget=unlimited)...",
-            ctx.model
-        ),
+        None => info!("Running Claude (model={}, budget=unlimited)...", ctx.model),
     }
     info!("Log: {log_file}");
 
