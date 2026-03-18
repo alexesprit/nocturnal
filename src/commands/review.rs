@@ -11,7 +11,7 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
     run_unlocked(ctx)
 }
 
-pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
+fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
     let td_client = td::Td::new(&ctx.project_root);
 
     let task_id = match td_client.get_reviewable_task_id()? {
@@ -22,9 +22,17 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         }
     };
 
+    review_task(ctx, &task_id).map(|_| ())
+}
+
+/// Review a specific task. Returns Ok(true) if review completed successfully
+/// (approved, rejected, or proposal created).
+pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
+    let td_client = td::Td::new(&ctx.project_root);
+
     info!("=== Reviewing task: {task_id} ===");
 
-    let task = td_client.show(&task_id)?;
+    let task = td_client.show(task_id)?;
     let review_count = td::get_review_count(&task);
     if review_count >= ctx.max_reviews {
         info!(
@@ -33,63 +41,63 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         );
         td_client
             .comment(
-                &task_id,
+                task_id,
                 &format!(
                     "Orchestrator: max review cycles reached ({review_count}/{}). Needs human review.",
                     ctx.max_reviews
                 ),
             )
             .ok();
-        td_client.block(&task_id).ok();
-        return Ok(());
+        td_client.block(task_id).ok();
+        return Ok(false);
     }
 
     if ctx.cfg.dry_run {
         info!("dry-run: would invoke Claude for review of task {task_id}");
         info!("dry-run: would update task state based on review outcome");
-        return Ok(());
+        return Ok(false);
     }
 
-    let wt_path = git::worktree_path(&ctx.project_root, &task_id)?.ok_or_else(|| {
+    let wt_path = git::worktree_path(&ctx.project_root, task_id)?.ok_or_else(|| {
         anyhow::anyhow!(
             "No worktree found for {task_id} — expected branch {}",
-            git::worktree_branch(&task_id)
+            git::worktree_branch(task_id)
         )
     })?;
 
     let review_cycle = review_count + 1;
     let rendered = prompt::render_with_review_cycle(
         prompt::Template::Review,
-        &task_id,
+        task_id,
         &ctx.project_root,
         ctx.max_reviews,
         Some(review_cycle),
     );
 
     let slug = ctx.project_slug();
-    let log_file = claude::log_path(&ctx.cfg.log_dir, "review", &task_id);
+    let log_file = claude::log_path(&ctx.cfg.log_dir, "review", task_id);
 
     if !claude::run(
-        ctx, &wt_path, &rendered, &log_file, "review", &slug, &task_id,
+        ctx, &wt_path, &rendered, &log_file, "review", &slug, task_id,
     )? {
         error!("Review failed (exit code nonzero)");
-        return Ok(());
+        return Ok(false);
     }
 
     info!("Review completed");
 
     // Re-read task to see what the review agent decided
-    let task = td_client.show(&task_id)?;
+    let task = td_client.show(task_id)?;
 
     if task.labels.iter().any(|l| l.starts_with("noc-proposal:")) {
         info!("Task {task_id} already has an open proposal — skipping re-review");
     } else if task.labels.iter().any(|l| l == "noc-proposal-ready") {
         info!("Task {task_id} passed internal review — creating proposal");
-        super::proposal_review::create_proposal(ctx, &task_id)?;
+        super::proposal_review::create_proposal(ctx, task_id)?;
     } else if task.status == "open" {
         let new_count = td::get_review_count(&task) + 1;
         let labels = td::build_labels_with_review_count(&task, new_count);
-        td_client.update_labels(&task_id, &labels)?;
+        td_client.update_labels(task_id, &labels)?;
         info!(
             "Task rejected (review cycle {new_count}/{})",
             ctx.max_reviews
@@ -98,14 +106,14 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         if new_count >= ctx.max_reviews {
             td_client
                 .comment(
-                    &task_id,
+                    task_id,
                     &format!(
                         "Orchestrator: max review cycles reached ({new_count}/{}). Needs human review.",
                         ctx.max_reviews
                     ),
                 )
                 .ok();
-            td_client.block(&task_id).ok();
+            td_client.block(task_id).ok();
             info!("Task blocked — needs human attention");
         }
     } else {
@@ -115,5 +123,5 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         );
     }
 
-    Ok(())
+    Ok(true)
 }

@@ -48,8 +48,6 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
             vcs::ProposalState::Merged => {
                 info!("Proposal #{proposal_id} merged — approving task");
                 td_client.approve(&task_id)?;
-                let labels = td::swap_label(&task, "noc-proposal:", None);
-                td_client.update_labels(&task_id, &labels)?;
                 continue;
             }
             vcs::ProposalState::Closed => {

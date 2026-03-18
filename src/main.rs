@@ -7,6 +7,7 @@ mod lock;
 mod project_config;
 mod prompt;
 mod td;
+mod usage;
 mod vcs;
 mod web;
 
