@@ -875,6 +875,55 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
     }
 }
 
+pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> Response {
+    let entry = match state.find_project(&name) {
+        Some(e) => e,
+        None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
+    };
+
+    let slug = crate::config::project_slug(&entry.path);
+    let lock_status = check_lock_status(&state.lock_dir, &slug);
+    let project_path = entry.path.clone();
+
+    if matches!(lock_status, LockStatus::Running(_)) {
+        return Html(
+            r#"<span class="rotate-feedback rotate-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('develop-feedback');if(f)f.innerHTML='';},4000);</script>"#,
+        )
+        .into_response();
+    }
+
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(e) => {
+            error!("failed to get current exe: {e}");
+            return Html(
+                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
+            )
+            .into_response();
+        }
+    };
+
+    match std::process::Command::new(&exe)
+        .args(["develop", "--project", &project_path])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(_child) => Html(
+            r#"<span class="rotate-feedback rotate-feedback-ok">Develop triggered</span><script>setTimeout(function(){var f=document.getElementById('develop-feedback');if(f)f.innerHTML='';},4000);</script>"#,
+        )
+        .into_response(),
+        Err(e) => {
+            error!("failed to spawn run for {name}: {e}");
+            Html(
+                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
+            )
+            .into_response()
+        }
+    }
+}
+
 // --- Helpers ---
 
 fn into_html_response<T: Template>(tmpl: T) -> Response {
