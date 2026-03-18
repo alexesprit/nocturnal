@@ -30,6 +30,7 @@ const ALLOWED_TYPES: &[&str] = &["all", "bug", "feature", "task", "epic", "chore
 const ALLOWED_SORTS: &[&str] = &[
     "priority", "created", "modified", "status", "title", "updated",
 ];
+const ALLOWED_VIEWS: &[&str] = &["table", "kanban"];
 
 fn sanitize_param(value: &str, allowed: &[&str]) -> Option<String> {
     if allowed.contains(&value) {
@@ -68,7 +69,12 @@ struct ProjectTemplate {
     title: String,
     breadcrumbs: Vec<Breadcrumb>,
     name: String,
+    view: String,
     issues: Vec<Task>,
+    open: Vec<Task>,
+    in_progress: Vec<Task>,
+    blocked: Vec<Task>,
+    in_review: Vec<Task>,
 }
 
 #[derive(Template)]
@@ -90,10 +96,20 @@ struct IssueTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "partials/issue_table.html")]
-struct IssueTableTemplate {
+#[template(path = "partials/table_wrapper.html")]
+struct TableWrapperTemplate {
     name: String,
     issues: Vec<Task>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/kanban_board.html")]
+struct KanbanBoardTemplate {
+    name: String,
+    open: Vec<Task>,
+    in_progress: Vec<Task>,
+    blocked: Vec<Task>,
+    in_review: Vec<Task>,
 }
 
 #[derive(Template)]
@@ -128,6 +144,8 @@ pub struct IssueFilterParams {
     q: String,
     #[serde(default)]
     sort: String,
+    #[serde(default)]
+    view: String,
 }
 
 // --- Handlers ---
@@ -586,11 +604,18 @@ fn find_worktree_for_task(project_path: &str, task_id: &str) -> (Option<String>,
     (None, None)
 }
 
-pub async fn project(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> Response {
+pub async fn project(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Query(params): Query<IssueFilterParams>,
+) -> Response {
     let entry = match state.find_project(&name) {
         Some(e) => e,
         None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
     };
+
+    let view = sanitize_param(&params.view, ALLOWED_VIEWS)
+        .unwrap_or_else(|| "table".to_string());
 
     let td_binary = state.td_binary.clone();
     let path = entry.path.clone();
@@ -610,6 +635,12 @@ pub async fn project(State(state): State<Arc<AppState>>, Path(name): Path<String
 
     match result {
         Ok(Ok(issues)) => {
+            let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
+                let (o, ip, bl, ir) = group_by_status(issues);
+                (Vec::new(), o, ip, bl, ir)
+            } else {
+                (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            };
             let tmpl = ProjectTemplate {
                 title: name.clone(),
                 breadcrumbs: vec![Breadcrumb {
@@ -617,7 +648,12 @@ pub async fn project(State(state): State<Arc<AppState>>, Path(name): Path<String
                     url: None,
                 }],
                 name,
-                issues,
+                view,
+                issues: table_issues,
+                open,
+                in_progress,
+                blocked,
+                in_review,
             };
             into_html_response(tmpl)
         }
@@ -653,6 +689,9 @@ pub async fn project_issues(
 
     let is_htmx = headers.get("HX-Request").is_some();
 
+    let view = sanitize_param(&params.view, ALLOWED_VIEWS)
+        .unwrap_or_else(|| "table".to_string());
+
     const MAX_QUERY_LEN: usize = 200;
     let query = if params.q.is_empty()
         || params.q.starts_with('-')
@@ -682,9 +721,21 @@ pub async fn project_issues(
     match result {
         Ok(Ok(issues)) => {
             if is_htmx {
-                let tmpl = IssueTableTemplate { name, issues };
-                into_html_response(tmpl)
+                if view == "kanban" {
+                    let (open, in_progress, blocked, in_review) = group_by_status(issues);
+                    let tmpl = KanbanBoardTemplate { name, open, in_progress, blocked, in_review };
+                    into_html_response(tmpl)
+                } else {
+                    let tmpl = TableWrapperTemplate { name, issues };
+                    into_html_response(tmpl)
+                }
             } else {
+                let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
+                    let (o, ip, bl, ir) = group_by_status(issues);
+                    (Vec::new(), o, ip, bl, ir)
+                } else {
+                    (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
+                };
                 let tmpl = ProjectTemplate {
                     title: name.clone(),
                     breadcrumbs: vec![Breadcrumb {
@@ -692,7 +743,12 @@ pub async fn project_issues(
                         url: None,
                     }],
                     name,
-                    issues,
+                    view,
+                    issues: table_issues,
+                    open,
+                    in_progress,
+                    blocked,
+                    in_review,
                 };
                 into_html_response(tmpl)
             }
@@ -791,6 +847,23 @@ pub async fn issue(
             (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
         }
     }
+}
+
+fn group_by_status(issues: Vec<Task>) -> (Vec<Task>, Vec<Task>, Vec<Task>, Vec<Task>) {
+    let mut open = Vec::new();
+    let mut in_progress = Vec::new();
+    let mut blocked = Vec::new();
+    let mut in_review = Vec::new();
+    for task in issues {
+        match task.status.as_str() {
+            "open" => open.push(task),
+            "in_progress" => in_progress.push(task),
+            "blocked" => blocked.push(task),
+            "in_review" => in_review.push(task),
+            _ => {}
+        }
+    }
+    (open, in_progress, blocked, in_review)
 }
 
 // --- td CLI wrappers ---

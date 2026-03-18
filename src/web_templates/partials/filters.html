@@ -1,46 +1,79 @@
-<form
-    hx-get="/projects/{{ name }}/issues"
-    hx-target="#issue-table-body"
-    hx-trigger="change from:select, keyup changed delay:300ms from:input"
-    hx-swap="innerHTML"
->
-    <fieldset role="group">
-        <select name="status" aria-label="Filter by status">
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="blocked">Blocked</option>
-            <option value="in_review">In Review</option>
-            <option value="closed">Closed</option>
-        </select>
-        <select name="priority" aria-label="Filter by priority">
-            <option value="">All priorities</option>
-            <option value="P0">P0</option>
-            <option value="P1">P1</option>
-            <option value="P2">P2</option>
-            <option value="P3">P3</option>
-            <option value="P4">P4</option>
-        </select>
-        <select name="type" aria-label="Filter by type">
-            <option value="">All types</option>
-            <option value="bug">Bug</option>
-            <option value="feature">Feature</option>
-            <option value="task">Task</option>
-            <option value="epic">Epic</option>
-            <option value="chore">Chore</option>
-        </select>
-        <input
-            type="search"
-            name="q"
-            placeholder="Search tasks..."
-            aria-label="Search tasks"
-        />
-        <select name="sort" aria-label="Sort by">
-            <option value="">Sort by default</option>
-            <option value="updated">Updated</option>
-            <option value="created">Created</option>
-            <option value="priority">Priority</option>
-            <option value="status">Status</option>
-        </select>
-    </fieldset>
-</form>
+<div class="filters-bar">
+    <form id="filters-form"
+        hx-get="/projects/{{ name }}/issues"
+        hx-target="#content-panel"
+        hx-trigger="change from:select, keyup changed delay:300ms from:input"
+        hx-swap="innerHTML"
+    >
+        <fieldset role="group">
+            <select name="status" aria-label="Filter by status">
+                <option value="">All statuses</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="blocked">Blocked</option>
+                <option value="in_review">In Review</option>
+                <option value="closed">Closed</option>
+            </select>
+            <select name="priority" aria-label="Filter by priority">
+                <option value="">All priorities</option>
+                <option value="P0">P0</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+                <option value="P3">P3</option>
+                <option value="P4">P4</option>
+            </select>
+            <select name="type" aria-label="Filter by type">
+                <option value="">All types</option>
+                <option value="bug">Bug</option>
+                <option value="feature">Feature</option>
+                <option value="task">Task</option>
+                <option value="epic">Epic</option>
+                <option value="chore">Chore</option>
+            </select>
+            <input
+                type="search"
+                name="q"
+                placeholder="Search tasks..."
+                aria-label="Search tasks"
+            />
+            <select name="sort" aria-label="Sort by">
+                <option value="">Sort by default</option>
+                <option value="updated">Updated</option>
+                <option value="created">Created</option>
+                <option value="priority">Priority</option>
+                <option value="status">Status</option>
+            </select>
+        </fieldset>
+        <input type="hidden" name="view" id="view-input" value="{{ view }}">
+    </form>
+    <div class="view-toggle" id="view-toggle">
+        <button
+            class="view-btn{% if view != "kanban" %} view-btn-active{% endif %}"
+            onclick="nocSetView(this, 'table')"
+            hx-get="/projects/{{ name }}/issues"
+            hx-include="#filters-form"
+            hx-target="#content-panel"
+            hx-swap="innerHTML"
+            aria-label="Table view"
+        >Table</button>
+        <button
+            class="view-btn{% if view == "kanban" %} view-btn-active{% endif %}"
+            onclick="nocSetView(this, 'kanban')"
+            hx-get="/projects/{{ name }}/issues"
+            hx-include="#filters-form"
+            hx-target="#content-panel"
+            hx-swap="innerHTML"
+            aria-label="Kanban view"
+        >Kanban</button>
+    </div>
+</div>
+<script>
+function nocSetView(el, v) {
+    document.getElementById('view-input').value = v;
+    document.querySelectorAll('.view-btn').forEach(function(b) { b.classList.remove('view-btn-active'); });
+    el.classList.add('view-btn-active');
+    var url = new URL(window.location.href);
+    url.searchParams.set('view', v);
+    history.replaceState(null, '', url.toString());
+}
+</script>

@@ -11,20 +11,11 @@
     </div>
 </div>
 {% include "partials/filters.html" %}
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>Type</th>
-            <th>Labels</th>
-            <th>Updated</th>
-        </tr>
-    </thead>
-    <tbody id="issue-table-body">
-        {% include "partials/issue_table.html" %}
-    </tbody>
-</table>
+<div id="content-panel">
+{% if view == "kanban" %}
+{% include "partials/kanban_board.html" %}
+{% else %}
+{% include "partials/table_wrapper.html" %}
+{% endif %}
+</div>
 {% endblock %}
