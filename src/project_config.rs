@@ -17,16 +17,23 @@ pub enum VcsMode {
     GitLab,
 }
 
+#[derive(Debug, Default, Deserialize)]
+struct VcsConfig {
+    mode: Option<VcsMode>,
+    auto_merge: Option<bool>,
+}
+
 #[derive(Debug, Deserialize)]
 struct ProjectConfig {
-    vcs: Option<VcsMode>,
+    vcs: Option<VcsConfig>,
     max_reviews: Option<u32>,
     max_budget: Option<u32>,
     model: Option<String>,
 }
 
 pub struct ProjectSettings {
-    pub vcs: VcsMode,
+    pub vcs_mode: VcsMode,
+    pub auto_merge: bool,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
     pub model: String,
@@ -43,12 +50,16 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
         }
     };
     match toml::from_str::<ProjectConfig>(&content) {
-        Ok(f) => ProjectSettings {
-            vcs: f.vcs.unwrap_or_default(),
-            max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
-            max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
-            model: f.model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
-        },
+        Ok(f) => {
+            let vcs = f.vcs.unwrap_or_default();
+            ProjectSettings {
+                vcs_mode: vcs.mode.unwrap_or_default(),
+                auto_merge: vcs.auto_merge.unwrap_or(true),
+                max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
+                max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
+                model: f.model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
+            }
+        }
         Err(e) => {
             tracing::warn!("Failed to parse {}: {e}", path.display());
             ProjectSettings::default()
@@ -59,7 +70,8 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
 impl Default for ProjectSettings {
     fn default() -> Self {
         ProjectSettings {
-            vcs: VcsMode::default(),
+            vcs_mode: VcsMode::default(),
+            auto_merge: true,
             max_reviews: DEFAULT_MAX_REVIEWS,
             max_budget: DEFAULT_MAX_BUDGET,
             model: DEFAULT_MODEL.to_string(),
@@ -69,7 +81,7 @@ impl Default for ProjectSettings {
 
 /// Convenience wrapper kept for callers that only need vcs mode.
 pub fn load_vcs_mode(project_root: &str) -> VcsMode {
-    load_project_settings(project_root).vcs
+    load_project_settings(project_root).vcs_mode
 }
 
 #[cfg(test)]
@@ -77,38 +89,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_vcs_off() {
-        let f: ProjectConfig = toml::from_str("vcs = \"off\"").unwrap();
-        assert_eq!(f.vcs.unwrap(), VcsMode::Off);
-    }
-
-    #[test]
-    fn parse_vcs_auto() {
-        let f: ProjectConfig = toml::from_str("vcs = \"auto\"").unwrap();
-        assert_eq!(f.vcs.unwrap(), VcsMode::Auto);
-    }
-
-    #[test]
-    fn parse_vcs_github() {
-        let f: ProjectConfig = toml::from_str("vcs = \"github\"").unwrap();
-        assert_eq!(f.vcs.unwrap(), VcsMode::GitHub);
-    }
-
-    #[test]
-    fn parse_vcs_gitlab() {
-        let f: ProjectConfig = toml::from_str("vcs = \"gitlab\"").unwrap();
-        assert_eq!(f.vcs.unwrap(), VcsMode::GitLab);
+    fn parse_vcs_modes() {
+        for (input, expected) in [
+            ("off", VcsMode::Off),
+            ("auto", VcsMode::Auto),
+            ("github", VcsMode::GitHub),
+            ("gitlab", VcsMode::GitLab),
+        ] {
+            let f: ProjectConfig = toml::from_str(&format!("[vcs]\nmode = \"{input}\"")).unwrap();
+            assert_eq!(f.vcs.unwrap().mode.unwrap(), expected);
+        }
     }
 
     #[test]
     fn parse_missing_vcs() {
         let f: ProjectConfig = toml::from_str("").unwrap();
-        assert_eq!(f.vcs.unwrap_or_default(), VcsMode::Off);
+        assert_eq!(
+            f.vcs.unwrap_or_default().mode.unwrap_or_default(),
+            VcsMode::Off
+        );
     }
 
     #[test]
-    fn parse_unrecognized_value_is_error() {
-        assert!(toml::from_str::<ProjectConfig>("vcs = \"bitbucket\"").is_err());
+    fn parse_unrecognized_vcs_mode_is_error() {
+        assert!(toml::from_str::<ProjectConfig>("[vcs]\nmode = \"bitbucket\"").is_err());
     }
 
     #[test]
@@ -118,13 +122,46 @@ mod tests {
 
     #[test]
     fn parse_full_config() {
-        let f: ProjectConfig =
-            toml::from_str("vcs = \"gitlab\"\nmax_reviews = 5\nmax_budget = 10\nmodel = \"opus\"")
-                .unwrap();
-        assert_eq!(f.vcs.unwrap(), VcsMode::GitLab);
+        let f: ProjectConfig = toml::from_str(
+            "max_reviews = 5\nmax_budget = 10\nmodel = \"opus\"\n\n[vcs]\nmode = \"gitlab\"\nauto_merge = false",
+        )
+        .unwrap();
+        let vcs = f.vcs.unwrap();
+        assert_eq!(vcs.mode.unwrap(), VcsMode::GitLab);
+        assert!(!vcs.auto_merge.unwrap());
         assert_eq!(f.max_reviews.unwrap(), 5);
         assert_eq!(f.max_budget.unwrap(), 10);
         assert_eq!(f.model.unwrap(), "opus");
+    }
+
+    #[test]
+    fn auto_merge_defaults_to_true() {
+        let settings = load_project_settings("/nonexistent/path");
+        assert!(settings.auto_merge);
+    }
+
+    #[test]
+    fn vcs_auto_merge_false() {
+        let f: ProjectConfig =
+            toml::from_str("[vcs]\nmode = \"github\"\nauto_merge = false").unwrap();
+        let vcs = f.vcs.unwrap();
+        assert!(!vcs.auto_merge.unwrap());
+    }
+
+    #[test]
+    fn empty_vcs_section_uses_defaults() {
+        let f: ProjectConfig = toml::from_str("[vcs]").unwrap();
+        let vcs = f.vcs.unwrap();
+        assert_eq!(vcs.mode.unwrap_or_default(), VcsMode::Off);
+        assert!(vcs.auto_merge.is_none());
+    }
+
+    #[test]
+    fn vcs_auto_merge_only_defaults_mode_to_off() {
+        let f: ProjectConfig = toml::from_str("[vcs]\nauto_merge = false").unwrap();
+        let vcs = f.vcs.unwrap();
+        assert_eq!(vcs.mode.unwrap_or_default(), VcsMode::Off);
+        assert!(!vcs.auto_merge.unwrap());
     }
 
     #[test]

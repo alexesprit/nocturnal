@@ -19,6 +19,7 @@ pub struct ProjectContext {
     pub cfg: Config,
     pub project_root: String,
     pub vcs_mode: VcsMode,
+    pub auto_merge: bool,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
     pub model: String,
@@ -30,7 +31,8 @@ impl ProjectContext {
         Self {
             cfg,
             project_root,
-            vcs_mode: settings.vcs,
+            vcs_mode: settings.vcs_mode,
+            auto_merge: settings.auto_merge,
             max_reviews: settings.max_reviews,
             max_budget: settings.max_budget,
             model: settings.model,

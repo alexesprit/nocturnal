@@ -197,18 +197,24 @@ nocturnal tracks state through `td` statuses and labels:
 VCS integration is configured per project via `.nocturnal.toml` in the project root:
 
 ```toml
+[vcs]
 # "auto"   — detect GitLab/GitHub from origin remote URL
 # "github" — force GitHub
 # "gitlab" — force GitLab
-# "off"    — no proposals (default if file is missing)
-vcs = "auto"
+# "off"    — no proposals (default if section is missing)
+mode = "auto"
+
+# Enable auto-merge on created proposals (default: true)
+# Set to false if your repo has no branch protection rules,
+# otherwise the PR/MR will be merged immediately on creation.
+auto_merge = false
 ```
 
 When VCS is enabled and a task passes internal review:
 
 1. Branch is pushed to origin
 2. MR (GitLab) or PR (GitHub) is created with the task title and description
-3. Auto-merge is enabled if the platform supports it
+3. Auto-merge is enabled (if `auto_merge = true` and the platform supports it)
 4. On subsequent runs, nocturnal checks for unresolved comments and runs Claude to address them
 5. Once the proposal is merged, the task is closed
 

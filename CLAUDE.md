@@ -61,7 +61,9 @@ ls -lt ${TMPDIR}/nocturnal-logs/
 ## Per-Project Configuration
 
 Each project can have a `.nocturnal.toml` in its root. Currently supports:
-- `vcs` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.
+- `[vcs]` section:
+  - `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.
+  - `auto_merge` — boolean (default `true`). When `false`, nocturnal creates the PR/MR but does not enable auto-merge.
 
 ## Rust Conventions
 

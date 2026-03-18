@@ -152,11 +152,15 @@ pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
     info!("Proposal created: {platform} #{}", proposal.id);
 
     // Enable auto-merge (best-effort)
-    std::thread::sleep(std::time::Duration::from_secs(5));
-    if vcs::enable_auto_merge(platform, &wt_path, &proposal.id) {
-        info!("Auto-merge enabled for #{}", proposal.id);
+    if ctx.auto_merge {
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        if vcs::enable_auto_merge(platform, &wt_path, &proposal.id) {
+            info!("Auto-merge enabled for #{}", proposal.id);
+        } else {
+            info!("Auto-merge not available for #{}", proposal.id);
+        }
     } else {
-        info!("Auto-merge not available for #{}", proposal.id);
+        info!("Auto-merge disabled by config");
     }
 
     // Swap labels
