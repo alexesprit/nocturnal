@@ -6,7 +6,7 @@ use crate::{claude, git, lock, prompt, td, vcs};
 
 pub fn run(ctx: &ProjectContext) -> Result<()> {
     let slug = ctx.project_slug();
-    let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("proposal-review-{slug}"))?;
+    let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("proposal-{slug}"))?;
 
     run_unlocked(ctx)?;
     Ok(())
@@ -29,7 +29,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
         info!("=== Checking proposal for task: {task_id} ===");
 
         if ctx.cfg.dry_run {
-            info!("dry-run: would invoke Claude for proposal-review of task {task_id}");
+            info!("dry-run: would invoke Claude for proposal of task {task_id}");
             continue;
         }
 
@@ -100,16 +100,10 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
         ));
 
         let slug = ctx.project_slug();
-        let log_file = claude::log_path(&ctx.cfg.log_dir, "proposal-review", &task_id);
+        let log_file = claude::log_path(&ctx.cfg.log_dir, "proposal", &task_id);
 
         if claude::run(
-            ctx,
-            &wt_path,
-            &rendered,
-            &log_file,
-            "proposal-review",
-            &slug,
-            &task_id,
+            ctx, &wt_path, &rendered, &log_file, "proposal", &slug, &task_id,
         )? {
             info!("Proposal review completed");
         } else {
@@ -120,7 +114,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
         return Ok(true);
     }
 
-    Ok(true)
+    Ok(false)
 }
 
 pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {

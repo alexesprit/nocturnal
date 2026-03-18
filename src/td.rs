@@ -57,6 +57,19 @@ impl<'a> Td<'a> {
         cmd
     }
 
+    /// Like cmd() but strips session-identifying env vars so td does not associate
+    /// the orchestrator's terminal session with the task. Used for start/review calls
+    /// that nocturnal makes on behalf of Claude.
+    fn cmd_no_session(&self) -> Command {
+        let mut cmd = self.cmd();
+        cmd.env_remove("TERM_SESSION_ID")
+            .env_remove("CLAUDE_SESSION_ID")
+            .env_remove("CURSOR_SESSION_ID")
+            .env_remove("AI_SESSION_ID")
+            .env_remove("TD_SESSION_ID");
+        cmd
+    }
+
     fn run(&self, args: &[&str]) -> Result<String> {
         let output = self.cmd().args(args).output().context("Failed to run td")?;
 
@@ -131,15 +144,54 @@ impl<'a> Td<'a> {
     }
 
     pub fn start(&self, task_id: &str) -> Result<()> {
-        self.run_quiet(&["start", task_id])
+        let output = self
+            .cmd_no_session()
+            .args(["start", task_id])
+            .output()
+            .context("Failed to run td start")?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !output.status.success() {
+            debug!("td start {} failed (ignored): {}", task_id, stderr.trim());
+        } else {
+            debug!("td start {}: {}", task_id, stdout.trim());
+        }
+        Ok(())
     }
 
     pub fn review(&self, task_id: &str) -> Result<()> {
-        self.run_quiet(&["review", task_id])
+        let output = self
+            .cmd_no_session()
+            .args(["review", task_id])
+            .output()
+            .context("Failed to run td review")?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !output.status.success() {
+            debug!("td review {} failed (ignored): {}", task_id, stderr.trim());
+        } else {
+            debug!("td review {}: {}", task_id, stdout.trim());
+        }
+        Ok(())
     }
 
     pub fn approve(&self, task_id: &str) -> Result<()> {
-        self.run(&["approve", task_id]).map(|_| ())
+        let output = self
+            .cmd()
+            .args(["approve", task_id])
+            .output()
+            .context("Failed to run td approve")?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !output.status.success() {
+            bail!("td approve {} failed: {}", task_id, stderr.trim());
+        }
+        let out = stdout.trim();
+        let out_lower = out.to_ascii_lowercase();
+        if out_lower.starts_with("error:") || out_lower.starts_with("warning:") {
+            bail!("td approve {} failed: {}", task_id, out);
+        }
+        Ok(())
     }
 
     pub fn reject(&self, task_id: &str, reason: &str) -> Result<()> {

@@ -314,11 +314,16 @@ fn collect_worktree_task_ids(project_path: &str) -> Vec<String> {
 }
 
 fn check_lock_status(lock_dir: &str, slug: &str) -> LockStatus {
-    let lock_path = std::path::PathBuf::from(lock_dir).join(format!("nocturnal.run-{slug}.lock"));
-
-    if !lock_path.is_dir() {
-        return LockStatus::Idle;
-    }
+    let base = std::path::PathBuf::from(lock_dir);
+    // Check both develop (run-{slug}) and proposal ({proposal-{slug}) locks.
+    let lock_names = [
+        format!("nocturnal.run-{slug}.lock"),
+        format!("nocturnal.proposal-{slug}.lock"),
+    ];
+    let lock_path = match lock_names.iter().map(|n| base.join(n)).find(|p| p.is_dir()) {
+        Some(p) => p,
+        None => return LockStatus::Idle,
+    };
 
     let pid_file = lock_path.join("pid");
     let pid_str = match std::fs::read_to_string(&pid_file) {

@@ -5,7 +5,6 @@ use crate::config::ProjectContext;
 use crate::lock;
 use crate::td::{NextAction, Td};
 use crate::usage;
-use crate::vcs;
 
 /// Returns Ok(true) if work was attempted, Ok(false) if nothing to do.
 pub fn run(ctx: &ProjectContext) -> Result<()> {
@@ -21,16 +20,9 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
 
 pub(crate) fn run_inner(ctx: &ProjectContext) -> Result<bool> {
     let td = Td::new(&ctx.project_root);
-    let check_proposals = vcs::detect_platform(&ctx.project_root, ctx.vcs_mode).is_some();
 
-    let action = td.get_next_action(check_proposals)?;
-
-    // Proposal review doesn't chain into the implement/review loop.
-    if let NextAction::ProposalReview(_) = &action {
-        info!("Found tasks with open proposals, running proposal review");
-        super::proposal_review::run_unlocked(ctx)?;
-        return Ok(true);
-    }
+    // false: proposals are handled exclusively by `proposal`/`proposal-rotate` commands.
+    let action = td.get_next_action(false)?;
 
     if let NextAction::Idle = &action {
         if ctx.cfg.dry_run {
@@ -43,7 +35,7 @@ pub(crate) fn run_inner(ctx: &ProjectContext) -> Result<bool> {
     // Bounded by max_reviews (task gets blocked) and usage budget.
     let task_id = action
         .task_id()
-        .expect("already handled Idle and ProposalReview above")
+        .expect("already handled Idle above")
         .to_string();
     let mut step = action;
 
@@ -72,7 +64,7 @@ pub(crate) fn run_inner(ctx: &ProjectContext) -> Result<bool> {
             break;
         }
 
-        step = td.get_next_action(check_proposals)?;
+        step = td.get_next_action(false)?; // proposals excluded, see above
     }
 
     Ok(true)

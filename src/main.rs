@@ -35,19 +35,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Pick next task: proposal-review, review, or implement [default]
-    Run,
+    /// Implement and review the next open task [default]
+    Develop,
     /// Pick and implement the highest-priority open task
     Implement,
     /// Pick and review the next reviewable task
     Review,
     /// Check open proposals for review comments and address them
-    ProposalReview,
-    /// Cycle through projects and run proposal-review for the first project with open proposals
-    ProposalReviewRotate,
-    /// Process one project per tick, cycling through the project list
-    Rotate,
-    /// Run 'run' for every project in the project list (same tick)
+    Proposal,
+    /// Cycle through projects and run proposal for the first project with open proposals
+    ProposalRotate,
+    /// Process one project per tick, cycling through the project list (implement+review)
+    DevelopRotate,
+    /// Run 'develop' for every project in the project list (same tick)
     Foreach,
     /// Start a read-only web dashboard for td-managed projects
     Web {
@@ -80,11 +80,11 @@ fn main() {
 fn run(cli: Cli) -> Result<()> {
     let mut cfg = config::Config::from_env();
     cfg.dry_run = cli.dry_run;
-    let command = cli.command.unwrap_or(Command::Run);
+    let command = cli.command.unwrap_or(Command::Develop);
 
     match command {
-        Command::Rotate => commands::rotate::run(&cfg),
-        Command::ProposalReviewRotate => commands::proposal_review_rotate::run(&cfg),
+        Command::DevelopRotate => commands::rotate::run(&cfg),
+        Command::ProposalRotate => commands::proposal_review_rotate::run(&cfg),
         Command::Foreach => commands::foreach::run(&cfg),
         Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
         _ => {
@@ -96,12 +96,12 @@ fn run(cli: Cli) -> Result<()> {
 
             let ctx = config::ProjectContext::new(cfg, project_root);
             match command {
-                Command::Run => commands::run::run(&ctx),
+                Command::Develop => commands::run::run(&ctx),
                 Command::Implement => commands::implement::run(&ctx),
                 Command::Review => commands::review::run(&ctx),
-                Command::ProposalReview => commands::proposal_review::run(&ctx),
-                Command::Rotate
-                | Command::ProposalReviewRotate
+                Command::Proposal => commands::proposal_review::run(&ctx),
+                Command::DevelopRotate
+                | Command::ProposalRotate
                 | Command::Foreach
                 | Command::Web { .. } => unreachable!(),
             }

@@ -44,7 +44,7 @@ pub fn run(cfg: &Config) -> Result<()> {
         }
 
         let slug = config::project_slug(project_root);
-        let lock_name = format!("proposal-review-{slug}");
+        let lock_name = format!("proposal-{slug}");
 
         let _lock = match lock::Lock::try_acquire(&cfg.lock_dir, &lock_name) {
             Some(l) => l,

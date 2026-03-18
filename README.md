@@ -61,17 +61,17 @@ The target repository must have `td` initialized (`td init`).
 ### Single Project
 
 ```bash
-# Auto-select: check proposals → review → implement
+# Auto-select: review → implement (default command)
 cd /path/to/repo
-nocturnal run
+nocturnal develop
 
 # Or specify the project explicitly
-nocturnal --project /path/to/repo run
+nocturnal --project /path/to/repo develop
 
 # Run a specific phase
-nocturnal implement        # Pick and implement the next open task
-nocturnal review           # Pick and review the next reviewable task
-nocturnal proposal-review  # Address comments on open MR/PR
+nocturnal implement  # Pick and implement the next open task
+nocturnal review     # Pick and review the next reviewable task
+nocturnal proposal   # Address comments on open MR/PR
 ```
 
 ### Web Dashboard
@@ -105,25 +105,28 @@ export NOCTURNAL_PROJECTS=/path/to/project-a:/path/to/project-b
 Then choose a scheduling strategy:
 
 ```bash
-# Round-robin: process one project per invocation
-nocturnal rotate
+# Round-robin: implement/review one project per invocation
+nocturnal develop-rotate
 
 # All at once: process every project in a single invocation
 nocturnal foreach
+
+# Round-robin: check proposals for one project per invocation
+nocturnal proposal-rotate
 ```
 
 ### Recommended Schedule
 
-Use `rotate` nightly to pick up and implement/review tasks, and `proposal-review` frequently (e.g. every 30 minutes) to address MR/PR comments promptly:
+Run `develop-rotate` nightly to implement/review tasks, and `proposal-rotate` frequently (e.g. every hour) to address MR/PR comments promptly. The two commands use separate locks and operate on disjoint task states, so they can run concurrently without conflict.
 
 #### cron
 
 ```cron
 # Rotate through projects nightly at 2 AM
-0 2 * * * nocturnal rotate
+0 2 * * * nocturnal develop-rotate
 
-# Check proposals for review comments every 30 minutes
-*/30 * * * * nocturnal --project /path/to/repo proposal-review
+# Check proposals for review comments every hour
+0 * * * * nocturnal proposal-rotate
 ```
 
 #### launchd
@@ -134,7 +137,7 @@ Nightly rotation (`~/Library/LaunchAgents/com.nocturnal.rotate.plist`):
 <key>ProgramArguments</key>
 <array>
   <string>/path/to/nocturnal</string>
-  <string>rotate</string>
+  <string>develop-rotate</string>
 </array>
 <key>StartCalendarInterval</key>
 <dict>
@@ -145,18 +148,16 @@ Nightly rotation (`~/Library/LaunchAgents/com.nocturnal.rotate.plist`):
 </dict>
 ```
 
-Proposal review every 30 minutes (`~/Library/LaunchAgents/com.nocturnal.proposal-review.plist`):
+Proposal review every hour (`~/Library/LaunchAgents/com.nocturnal.proposal-review.plist`):
 
 ```xml
 <key>ProgramArguments</key>
 <array>
   <string>/path/to/nocturnal</string>
-  <string>--project</string>
-  <string>/path/to/repo</string>
-  <string>proposal-review</string>
+  <string>proposal-rotate</string>
 </array>
 <key>StartInterval</key>
-<integer>1800</integer>
+<integer>3600</integer>
 ```
 
 ## Configuration

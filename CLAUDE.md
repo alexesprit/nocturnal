@@ -41,7 +41,7 @@ Templates in `prompts/` use `{{PLACEHOLDER}}` syntax, replaced via `String::repl
 - `{{PROJECT_ROOT}}` — absolute path to main repo (for `td -w`)
 - `{{MAX_REVIEWS}}` — max review cycles
 - `{{REVIEW_CYCLE}}` — current review cycle number (review prompt)
-- `{{VCS_REPLY_CMD}}` — platform-specific reply command (proposal-review prompt)
+- `{{VCS_REPLY_CMD}}` — platform-specific reply command (proposal prompt)
 
 Claude runs `cd`'d into the worktree. All `td` commands in prompts use `-w "{{PROJECT_ROOT}}"` to reach the `.todos/` database in the main repo.
 
@@ -50,7 +50,7 @@ Claude runs `cd`'d into the worktree. All `td` commands in prompts use `-w "{{PR
 No automated tests. Test manually against a repo with `td init`:
 ```bash
 cd /path/to/repo-with-td-init
-/path/to/nocturnal implement    # or: review, run
+/path/to/nocturnal implement    # or: review, develop
 ```
 
 Logs go to `$TMPDIR/nocturnal-logs/`. Check with:
