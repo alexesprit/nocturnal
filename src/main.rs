@@ -49,6 +49,8 @@ enum Command {
     DevelopRotate,
     /// Run 'develop' for every project in the project list (same tick)
     Foreach,
+    /// Remove worktrees for completed/blocked tasks and clean stale locks
+    Gc,
     /// Start a read-only web dashboard for td-managed projects
     Web {
         /// Server listen port
@@ -100,6 +102,7 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Implement => commands::implement::run(&ctx),
                 Command::Review => commands::review::run(&ctx),
                 Command::Proposal => commands::proposal_review::run(&ctx),
+                Command::Gc => commands::gc::run(&ctx),
                 Command::DevelopRotate
                 | Command::ProposalRotate
                 | Command::Foreach
