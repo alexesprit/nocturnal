@@ -257,52 +257,60 @@ pub fn fetch_unresolved_comments(
             Ok(serde_json::to_string_pretty(&comments)?)
         }
         Platform::GitHub => {
-            let inline_output = Command::new("gh")
-                .args([
-                    "api",
-                    &format!("repos/{{owner}}/{{repo}}/pulls/{proposal_id}/comments"),
-                ])
+            let query = format!(
+                r#"{{
+  repository(owner: "{{owner}}", name: "{{repo}}") {{
+    pullRequest(number: {proposal_id}) {{
+      reviewThreads(first: 100) {{
+        nodes {{
+          isResolved
+          comments(first: 100) {{
+            nodes {{
+              id
+              body
+              path
+              line
+              author {{ login }}
+            }}
+          }}
+        }}
+      }}
+    }}
+  }}
+}}"#
+            );
+
+            let output = Command::new("gh")
+                .args(["api", "graphql", "-f", &format!("query={query}")])
                 .current_dir(wt_path)
                 .output()
-                .context("Failed to fetch GitHub inline comments")?;
+                .context("Failed to fetch GitHub review threads")?;
 
-            let general_output = Command::new("gh")
-                .args([
-                    "api",
-                    &format!("repos/{{owner}}/{{repo}}/issues/{proposal_id}/comments"),
-                ])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to fetch GitHub general comments")?;
+            let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+            let empty = vec![];
+            let threads = json["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"]
+                .as_array()
+                .unwrap_or(&empty);
 
-            let inline: Vec<serde_json::Value> =
-                serde_json::from_slice(&inline_output.stdout).unwrap_or_default();
-            let general: Vec<serde_json::Value> =
-                serde_json::from_slice(&general_output.stdout).unwrap_or_default();
-
-            let mut comments: Vec<serde_json::Value> = inline
+            let comments: Vec<serde_json::Value> = threads
                 .iter()
-                .filter(|c| !c["position"].is_null())
+                .filter(|t| t["isResolved"] == false)
+                .flat_map(|t| {
+                    t["comments"]["nodes"]
+                        .as_array()
+                        .cloned()
+                        .unwrap_or_default()
+                })
                 .map(|c| {
                     serde_json::json!({
                         "id": c["id"],
-                        "author": c["user"]["login"],
+                        "author": c["author"]["login"],
                         "body": c["body"],
                         "path": c["path"],
-                        "line": c["position"],
+                        "line": c["line"],
                     })
                 })
                 .collect();
-
-            comments.extend(general.iter().map(|c| {
-                serde_json::json!({
-                    "id": c["id"],
-                    "author": c["user"]["login"],
-                    "body": c["body"],
-                    "path": null,
-                    "line": null,
-                })
-            }));
 
             Ok(serde_json::to_string_pretty(&comments)?)
         }
