@@ -695,7 +695,9 @@ pub async fn issue(
     let max_reviews = entry.max_reviews;
 
     let result = tokio::task::spawn_blocking(move || {
-        let detail = run_td_show(&td_binary, &path, &issue_id)?;
+        let mut detail = run_td_show(&td_binary, &path, &issue_id)?;
+        detail.depends_on = run_td_depends_on(&td_binary, &path, &issue_id);
+        detail.blocked_by = run_td_blocked_by(&td_binary, &path, &issue_id);
         let noc_state = derive_noc_state(
             &detail.labels,
             &detail.status,
@@ -807,6 +809,50 @@ fn run_td_list(td_binary: &str, project_path: &str, opts: &ListOpts) -> anyhow::
     let json = String::from_utf8_lossy(&output.stdout);
     let tasks: Vec<Task> = serde_json::from_str::<Option<Vec<Task>>>(&json)?.unwrap_or_default();
     Ok(tasks)
+}
+
+fn run_td_depends_on(td_binary: &str, project_path: &str, issue_id: &str) -> Vec<String> {
+    let output = std::process::Command::new(td_binary)
+        .args(["depends-on", issue_id, "--json", "-w", project_path])
+        .output();
+    let Ok(output) = output else { return vec![] };
+    if !output.status.success() {
+        return vec![];
+    }
+    let json = String::from_utf8_lossy(&output.stdout);
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
+        return vec![];
+    };
+    value["dependencies"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn run_td_blocked_by(td_binary: &str, project_path: &str, issue_id: &str) -> Vec<String> {
+    let output = std::process::Command::new(td_binary)
+        .args(["blocked-by", issue_id, "--json", "-w", project_path])
+        .output();
+    let Ok(output) = output else { return vec![] };
+    if !output.status.success() {
+        return vec![];
+    }
+    let json = String::from_utf8_lossy(&output.stdout);
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
+        return vec![];
+    };
+    value["direct"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v["id"].as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn run_td_show(td_binary: &str, project_path: &str, issue_id: &str) -> anyhow::Result<IssueDetail> {
