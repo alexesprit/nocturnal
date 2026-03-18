@@ -8,16 +8,18 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
     let slug = ctx.project_slug();
     let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("proposal-review-{slug}"))?;
 
-    run_unlocked(ctx)
+    run_unlocked(ctx)?;
+    Ok(())
 }
 
-pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
+/// Returns Ok(true) if there were proposal tasks to process, Ok(false) if nothing to do.
+pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
     let td_client = td::Td::new(&ctx.project_root);
 
     let task_ids = td_client.get_proposal_task_ids()?;
     if task_ids.is_empty() {
         info!("No tasks with open proposals");
-        return Ok(());
+        return Ok(false);
     }
 
     let platform = vcs::detect_platform(&ctx.project_root, ctx.vcs_mode)
@@ -115,10 +117,10 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
         }
 
         // Limit to one Claude invocation per tick
-        return Ok(());
+        return Ok(true);
     }
 
-    Ok(())
+    Ok(true)
 }
 
 pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
