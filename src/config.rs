@@ -8,9 +8,6 @@ use crate::project_config::{self, VcsMode};
 
 #[derive(Clone)]
 pub struct Config {
-    pub max_reviews: u32,
-    pub max_budget: Option<u32>,
-    pub model: String,
     pub lock_dir: String,
     pub log_dir: String,
     pub projects_file: String,
@@ -21,15 +18,21 @@ pub struct ProjectContext {
     pub cfg: Config,
     pub project_root: String,
     pub vcs_mode: VcsMode,
+    pub max_reviews: u32,
+    pub max_budget: Option<u32>,
+    pub model: String,
 }
 
 impl ProjectContext {
     pub fn new(cfg: Config, project_root: String) -> Self {
-        let vcs_mode = project_config::load_vcs_mode(&project_root);
+        let settings = project_config::load_project_settings(&project_root);
         Self {
             cfg,
             project_root,
-            vcs_mode,
+            vcs_mode: settings.vcs,
+            max_reviews: settings.max_reviews,
+            max_budget: settings.max_budget,
+            model: settings.model,
         }
     }
 
@@ -58,11 +61,6 @@ impl Config {
         });
 
         Config {
-            max_reviews: env_u32("NOCTURNAL_MAX_REVIEWS", 3),
-            max_budget: env::var("NOCTURNAL_MAX_BUDGET")
-                .ok()
-                .and_then(|v| v.parse().ok()),
-            model: env::var("NOCTURNAL_MODEL").unwrap_or_else(|_| "sonnet".to_string()),
             lock_dir: env::var("NOCTURNAL_LOCK_DIR").unwrap_or_else(|_| tmpdir.clone()),
             log_dir: env::var("NOCTURNAL_LOG_DIR")
                 .unwrap_or_else(|_| format!("{tmpdir}/nocturnal-logs")),
@@ -87,13 +85,6 @@ impl Config {
         }
         Vec::new()
     }
-}
-
-fn env_u32(key: &str, default: u32) -> u32 {
-    env::var(key)
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(default)
 }
 
 pub fn check_td_init(project_root: &str) -> Result<()> {

@@ -5,6 +5,7 @@ use tokio::signal;
 use tracing::{info, warn};
 
 use crate::config::Config;
+use crate::project_config;
 use crate::web::{self, AppState, ProjectEntry};
 
 pub fn run(cfg: &Config, addr: &str, port: u16) -> Result<()> {
@@ -18,7 +19,12 @@ pub fn run(cfg: &Config, addr: &str, port: u16) -> Result<()> {
                 .next()
                 .unwrap_or("")
                 .to_string();
-            ProjectEntry { name, path }
+            let settings = project_config::load_project_settings(&path);
+            ProjectEntry {
+                name,
+                path,
+                max_reviews: settings.max_reviews,
+            }
         })
         .collect();
 
@@ -31,7 +37,6 @@ pub fn run(cfg: &Config, addr: &str, port: u16) -> Result<()> {
         td_binary: "td".to_string(),
         lock_dir: cfg.lock_dir.clone(),
         log_dir: cfg.log_dir.clone(),
-        max_reviews: cfg.max_reviews,
         rotation_state_file: cfg.rotation_state_file.clone(),
     });
 

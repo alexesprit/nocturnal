@@ -17,6 +17,7 @@ struct StaticAssets;
 pub struct ProjectEntry {
     pub name: String,
     pub path: String,
+    pub max_reviews: u32,
 }
 
 pub struct AppState {
@@ -24,7 +25,6 @@ pub struct AppState {
     pub td_binary: String,
     pub lock_dir: String,
     pub log_dir: String,
-    pub max_reviews: u32,
     pub rotation_state_file: String,
 }
 
