@@ -57,21 +57,38 @@ impl<'a> Td<'a> {
         cmd
     }
 
-    /// Like cmd() but strips session-identifying env vars so td does not associate
-    /// the orchestrator's terminal session with the task. Used for start/review calls
-    /// that nocturnal makes on behalf of Claude.
-    fn cmd_no_session(&self) -> Command {
+    /// Command that identifies as the nocturnal implementer session.
+    /// Used for start/review calls that nocturnal makes on behalf of Claude.
+    fn cmd_implementer(&self) -> Command {
         let mut cmd = self.cmd();
-        cmd.env_remove("TERM_SESSION_ID")
-            .env_remove("CLAUDE_SESSION_ID")
-            .env_remove("CURSOR_SESSION_ID")
-            .env_remove("AI_SESSION_ID")
-            .env_remove("TD_SESSION_ID");
+        cmd.env("TD_SESSION_ID", "nocturnal-implementer");
+        cmd
+    }
+
+    /// Command that identifies as the nocturnal reviewer session.
+    /// Used for approve/reject calls — distinct from implementer to avoid self-approval.
+    fn cmd_reviewer(&self) -> Command {
+        let mut cmd = self.cmd();
+        cmd.env("TD_SESSION_ID", "nocturnal-reviewer");
         cmd
     }
 
     fn run(&self, args: &[&str]) -> Result<String> {
         let output = self.cmd().args(args).output().context("Failed to run td")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            bail!("td {} failed: {}", args.join(" "), stderr.trim());
+        }
+        String::from_utf8(output.stdout).context("td output was not valid UTF-8")
+    }
+
+    fn run_as_reviewer(&self, args: &[&str]) -> Result<String> {
+        let output = self
+            .cmd_reviewer()
+            .args(args)
+            .output()
+            .context("Failed to run td")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -145,7 +162,7 @@ impl<'a> Td<'a> {
 
     pub fn start(&self, task_id: &str) -> Result<()> {
         let output = self
-            .cmd_no_session()
+            .cmd_implementer()
             .args(["start", task_id])
             .output()
             .context("Failed to run td start")?;
@@ -161,7 +178,7 @@ impl<'a> Td<'a> {
 
     pub fn review(&self, task_id: &str) -> Result<()> {
         let output = self
-            .cmd_no_session()
+            .cmd_implementer()
             .args(["review", task_id])
             .output()
             .context("Failed to run td review")?;
@@ -177,7 +194,7 @@ impl<'a> Td<'a> {
 
     pub fn approve(&self, task_id: &str) -> Result<()> {
         let output = self
-            .cmd()
+            .cmd_reviewer()
             .args(["approve", task_id])
             .output()
             .context("Failed to run td approve")?;
@@ -195,7 +212,7 @@ impl<'a> Td<'a> {
     }
 
     pub fn reject(&self, task_id: &str, reason: &str) -> Result<()> {
-        self.run(&["reject", task_id, "--reason", reason])
+        self.run_as_reviewer(&["reject", task_id, "--reason", reason])
             .map(|_| ())
     }
 
