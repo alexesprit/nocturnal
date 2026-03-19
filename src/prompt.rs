@@ -59,9 +59,13 @@ pub fn render_with_vcs(
     project_root: &str,
     max_reviews: u32,
     vcs_reply_cmd: &str,
+    vcs_inline_reply_instructions: &str,
+    vcs_resolve_rule: &str,
 ) -> String {
     render_base(template, task_id, project_root, max_reviews)
         .replace("{{VCS_REPLY_CMD}}", vcs_reply_cmd)
+        .replace("{{VCS_INLINE_REPLY_INSTRUCTIONS}}", vcs_inline_reply_instructions)
+        .replace("{{VCS_RESOLVE_RULE}}", vcs_resolve_rule)
 }
 
 pub fn render_base(
@@ -123,8 +127,12 @@ mod tests {
             "/root",
             3,
             "glab mr note 42",
+            "",
+            "",
         );
         assert!(!result.contains("{{VCS_REPLY_CMD}}"));
+        assert!(!result.contains("{{VCS_INLINE_REPLY_INSTRUCTIONS}}"));
+        assert!(!result.contains("{{VCS_RESOLVE_RULE}}"));
         assert!(result.contains("glab mr note 42"));
     }
 
