@@ -257,31 +257,42 @@ pub fn fetch_unresolved_comments(
             Ok(serde_json::to_string_pretty(&comments)?)
         }
         Platform::GitHub => {
-            let query = format!(
-                r#"{{
-  repository(owner: "{{owner}}", name: "{{repo}}") {{
-    pullRequest(number: {proposal_id}) {{
-      reviewThreads(first: 100) {{
-        nodes {{
+            let (owner, repo) = gh_owner_repo(wt_path)?;
+
+            let query = r#"query($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $pr) {
+      reviewThreads(first: 100) {
+        nodes {
           isResolved
-          comments(first: 100) {{
-            nodes {{
+          comments(first: 100) {
+            nodes {
               id
               body
               path
               line
-              author {{ login }}
-            }}
-          }}
-        }}
-      }}
-    }}
-  }}
-}}"#
-            );
+              author { login }
+            }
+          }
+        }
+      }
+    }
+  }
+}"#;
 
             let output = Command::new("gh")
-                .args(["api", "graphql", "-f", &format!("query={query}")])
+                .args([
+                    "api",
+                    "graphql",
+                    "-f",
+                    &format!("query={query}"),
+                    "-F",
+                    &format!("owner={owner}"),
+                    "-F",
+                    &format!("repo={repo}"),
+                    "-F",
+                    &format!("pr={proposal_id}"),
+                ])
                 .current_dir(wt_path)
                 .output()
                 .context("Failed to fetch GitHub review threads")?;
@@ -315,6 +326,25 @@ pub fn fetch_unresolved_comments(
             Ok(serde_json::to_string_pretty(&comments)?)
         }
     })
+}
+
+fn gh_owner_repo(wt_path: &str) -> Result<(String, String)> {
+    let output = Command::new("gh")
+        .args(["repo", "view", "--json", "owner,name"])
+        .current_dir(wt_path)
+        .output()
+        .context("Failed to get GitHub repo info")?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("Failed to parse gh repo view output")?;
+    let owner = json["owner"]["login"]
+        .as_str()
+        .context("Missing owner in gh repo view")?
+        .to_string();
+    let repo = json["name"]
+        .as_str()
+        .context("Missing repo name in gh repo view")?
+        .to_string();
+    Ok((owner, repo))
 }
 
 fn extract_trailing_number(s: &str) -> Result<String> {
