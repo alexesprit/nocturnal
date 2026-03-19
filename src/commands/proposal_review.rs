@@ -88,12 +88,31 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             vcs::Platform::GitLab => format!("glab mr note {proposal_id} --message"),
             vcs::Platform::GitHub => format!("gh pr comment {proposal_id} --body"),
         };
+        let vcs_inline_reply_instructions = match platform {
+            vcs::Platform::GitHub => concat!(
+                "   **Inline review comment** (`path` is not null) with a `thread_id`:\n",
+                "   ```bash\n",
+                "   # Reply to the specific comment thread (replace COMMENT_ID with the comment's `id`)\n",
+                "   gh api repos/{owner}/{repo}/pulls/PROPOSAL_NUMBER/comments/COMMENT_ID/replies -f body=\"Addressed: <brief summary>\"\n",
+                "\n",
+                "   # Resolve the thread (replace THREAD_ID with the comment's `thread_id`)\n",
+                "   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { isResolved } } }'\n",
+                "   ```\n",
+            ),
+            vcs::Platform::GitLab => "",
+        };
+        let vcs_resolve_rule = match platform {
+            vcs::Platform::GitHub => "- Resolve inline review threads after addressing them (as described in step 3); do NOT dismiss threads without addressing them",
+            vcs::Platform::GitLab => "",
+        };
         let mut rendered = prompt::render_with_vcs(
             prompt::Template::ProposalReview,
             &task_id,
             &ctx.project_root,
             ctx.max_reviews,
             &vcs_reply_cmd,
+            vcs_inline_reply_instructions,
+            vcs_resolve_rule,
         );
         rendered.push_str(&format!(
             "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"

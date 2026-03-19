@@ -264,10 +264,11 @@ pub fn fetch_unresolved_comments(
     pullRequest(number: $pr) {
       reviewThreads(first: 100) {
         nodes {
+          id
           isResolved
-          comments(first: 100) {
+          comments(first: 1) {
             nodes {
-              id
+              databaseId
               body
               path
               line
@@ -303,25 +304,49 @@ pub fn fetch_unresolved_comments(
                 .as_array()
                 .unwrap_or(&empty);
 
-            let comments: Vec<serde_json::Value> = threads
+            let mut comments: Vec<serde_json::Value> = threads
                 .iter()
                 .filter(|t| t["isResolved"] == false)
-                .flat_map(|t| {
-                    t["comments"]["nodes"]
-                        .as_array()
-                        .cloned()
-                        .unwrap_or_default()
-                })
-                .map(|c| {
-                    serde_json::json!({
-                        "id": c["id"],
+                .filter_map(|t| {
+                    let thread_id = t["id"].as_str()?;
+                    let c = t["comments"]["nodes"].as_array()?.first()?;
+                    Some(serde_json::json!({
+                        "id": c["databaseId"],
+                        "thread_id": thread_id,
                         "author": c["author"]["login"],
                         "body": c["body"],
                         "path": c["path"],
                         "line": c["line"],
-                    })
+                    }))
                 })
                 .collect();
+
+            // Also fetch general PR (issue-level) comments
+            let issue_output = Command::new("gh")
+                .args([
+                    "api",
+                    &format!("repos/{owner}/{repo}/issues/{proposal_id}/comments"),
+                ])
+                .current_dir(wt_path)
+                .output()
+                .context("Failed to fetch GitHub issue comments")?;
+
+            if issue_output.status.success() {
+                if let Ok(serde_json::Value::Array(issue_comments)) =
+                    serde_json::from_slice::<serde_json::Value>(&issue_output.stdout)
+                {
+                    for c in issue_comments {
+                        comments.push(serde_json::json!({
+                            "id": c["id"],
+                            "thread_id": null,
+                            "author": c["user"]["login"],
+                            "body": c["body"],
+                            "path": null,
+                            "line": null,
+                        }));
+                    }
+                }
+            }
 
             Ok(serde_json::to_string_pretty(&comments)?)
         }

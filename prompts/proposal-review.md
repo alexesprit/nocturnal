@@ -40,10 +40,13 @@ git add -A && git commit --amend --no-edit
 git push origin HEAD --force-with-lease
 ```
 
-3. Post a reply to each comment thread you addressed:
-```bash
-{{VCS_REPLY_CMD}} "Addressed: <brief summary>"
-```
+3. For each comment you addressed, post a reply. The comment JSON includes `id`, `thread_id`, `path`, `line`, `author`, and `body`.
+
+{{VCS_INLINE_REPLY_INSTRUCTIONS}}
+   **General PR/MR comment** (`thread_id` is null):
+   ```bash
+   {{VCS_REPLY_CMD}} "Addressed: <brief summary>"
+   ```
 
 4. Log your work:
 ```bash
@@ -53,6 +56,6 @@ td log "Addressed proposal review comments" -w "{{PROJECT_ROOT}}"
 ## Rules
 
 - Do NOT call td approve, td reject, or td review
-- Do NOT resolve or dismiss comment threads
+{{VCS_RESOLVE_RULE}}
 - Always amend the last commit and force-push -- do NOT create additional fix commits
 - If a comment is unclear, post a reply asking for clarification rather than guessing
