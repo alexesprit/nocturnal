@@ -132,7 +132,14 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
         let log_file = claude::log_path(&ctx.cfg.log_dir, "proposal", &task_id);
 
         if claude::run(
-            ctx, &wt_path, &rendered, &log_file, "proposal", &slug, &task_id,
+            ctx,
+            &wt_path,
+            &rendered,
+            &log_file,
+            "proposal",
+            &slug,
+            &task_id,
+            &ctx.review_model,
         )? {
             info!("Proposal review completed");
         } else {

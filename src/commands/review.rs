@@ -78,7 +78,14 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     let log_file = claude::log_path(&ctx.cfg.log_dir, "review", task_id);
 
     if !claude::run(
-        ctx, &wt_path, &rendered, &log_file, "review", &slug, task_id,
+        ctx,
+        &wt_path,
+        &rendered,
+        &log_file,
+        "review",
+        &slug,
+        task_id,
+        &ctx.review_model,
     )? {
         error!("Review failed (exit code nonzero)");
         return Ok(false);

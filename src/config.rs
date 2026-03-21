@@ -23,7 +23,8 @@ pub struct ProjectContext {
     pub delete_branch_on_merge: bool,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
-    pub model: String,
+    pub implement_model: String,
+    pub review_model: String,
 }
 
 impl ProjectContext {
@@ -37,7 +38,8 @@ impl ProjectContext {
             delete_branch_on_merge: settings.delete_branch_on_merge,
             max_reviews: settings.max_reviews,
             max_budget: settings.max_budget,
-            model: settings.model,
+            implement_model: settings.implement_model,
+            review_model: settings.review_model,
         }
     }
 

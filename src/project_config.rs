@@ -24,12 +24,19 @@ struct VcsConfig {
     delete_branch_on_merge: Option<bool>,
 }
 
+#[derive(Debug, Default, Deserialize)]
+struct ClaudeConfig {
+    model: Option<String>,
+    implement_model: Option<String>,
+    review_model: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct ProjectConfig {
     vcs: Option<VcsConfig>,
     max_reviews: Option<u32>,
     max_budget: Option<u32>,
-    model: Option<String>,
+    claude: Option<ClaudeConfig>,
 }
 
 pub struct ProjectSettings {
@@ -38,7 +45,8 @@ pub struct ProjectSettings {
     pub delete_branch_on_merge: bool,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
-    pub model: String,
+    pub implement_model: String,
+    pub review_model: String,
 }
 
 pub fn load_project_settings(project_root: &str) -> ProjectSettings {
@@ -54,13 +62,20 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
     match toml::from_str::<ProjectConfig>(&content) {
         Ok(f) => {
             let vcs = f.vcs.unwrap_or_default();
+            let claude = f.claude.unwrap_or_default();
+            let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
             ProjectSettings {
                 vcs_mode: vcs.mode.unwrap_or_default(),
                 auto_merge: vcs.auto_merge.unwrap_or(true),
                 delete_branch_on_merge: vcs.delete_branch_on_merge.unwrap_or(false),
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
-                model: f.model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
+                implement_model: claude
+                    .implement_model
+                    .unwrap_or_else(|| default_model.to_string()),
+                review_model: claude
+                    .review_model
+                    .unwrap_or_else(|| default_model.to_string()),
             }
         }
         Err(e) => {
@@ -78,7 +93,8 @@ impl Default for ProjectSettings {
             delete_branch_on_merge: false,
             max_reviews: DEFAULT_MAX_REVIEWS,
             max_budget: DEFAULT_MAX_BUDGET,
-            model: DEFAULT_MODEL.to_string(),
+            implement_model: DEFAULT_MODEL.to_string(),
+            review_model: DEFAULT_MODEL.to_string(),
         }
     }
 }
@@ -127,7 +143,7 @@ mod tests {
     #[test]
     fn parse_full_config() {
         let f: ProjectConfig = toml::from_str(
-            "max_reviews = 5\nmax_budget = 10\nmodel = \"opus\"\n\n[vcs]\nmode = \"gitlab\"\nauto_merge = false",
+            "max_reviews = 5\nmax_budget = 10\n\n[vcs]\nmode = \"gitlab\"\nauto_merge = false\n\n[claude]\nmodel = \"opus\"",
         )
         .unwrap();
         let vcs = f.vcs.unwrap();
@@ -135,7 +151,7 @@ mod tests {
         assert!(!vcs.auto_merge.unwrap());
         assert_eq!(f.max_reviews.unwrap(), 5);
         assert_eq!(f.max_budget.unwrap(), 10);
-        assert_eq!(f.model.unwrap(), "opus");
+        assert_eq!(f.claude.unwrap().model.unwrap(), "opus");
     }
 
     #[test]
@@ -202,7 +218,8 @@ mod tests {
         let settings = load_project_settings("/nonexistent/path");
         assert_eq!(settings.max_reviews, DEFAULT_MAX_REVIEWS);
         assert_eq!(settings.max_budget, DEFAULT_MAX_BUDGET);
-        assert_eq!(settings.model, DEFAULT_MODEL);
+        assert_eq!(settings.implement_model, DEFAULT_MODEL);
+        assert_eq!(settings.review_model, DEFAULT_MODEL);
     }
 
     #[test]
@@ -210,7 +227,57 @@ mod tests {
         let f: ProjectConfig = toml::from_str("max_reviews = 7").unwrap();
         assert_eq!(f.max_reviews.unwrap(), 7);
         assert!(f.max_budget.is_none());
-        assert!(f.model.is_none());
+        assert!(f.claude.is_none());
         assert!(f.vcs.is_none());
+    }
+
+    #[test]
+    fn claude_section_model_fallback() {
+        let toml = "[claude]\nmodel = \"opus\"";
+        let settings_toml = format!("{toml}");
+        // Use a temp dir approach: write to a temp file and load
+        // Instead, test the struct directly
+        let f: ProjectConfig = toml::from_str(toml).unwrap();
+        let claude = f.claude.unwrap();
+        assert_eq!(claude.model.as_deref(), Some("opus"));
+        assert!(claude.implement_model.is_none());
+        assert!(claude.review_model.is_none());
+        // Resolution: implement_model falls back to model
+        let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
+        let implement_model = claude
+            .implement_model
+            .unwrap_or_else(|| default_model.to_string());
+        assert_eq!(implement_model, "opus");
+        drop(settings_toml);
+    }
+
+    #[test]
+    fn claude_section_per_operation_override() {
+        let f: ProjectConfig = toml::from_str(
+            "[claude]\nmodel = \"sonnet\"\nimplement_model = \"opus\"\nreview_model = \"haiku\"",
+        )
+        .unwrap();
+        let claude = f.claude.unwrap();
+        assert_eq!(claude.model.as_deref(), Some("sonnet"));
+        assert_eq!(claude.implement_model.as_deref(), Some("opus"));
+        assert_eq!(claude.review_model.as_deref(), Some("haiku"));
+    }
+
+    #[test]
+    fn empty_claude_section_uses_default_model() {
+        let f: ProjectConfig = toml::from_str("[claude]").unwrap();
+        let claude = f.claude.unwrap();
+        assert!(claude.model.is_none());
+        assert!(claude.implement_model.is_none());
+        assert!(claude.review_model.is_none());
+        let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
+        assert_eq!(default_model, DEFAULT_MODEL);
+    }
+
+    #[test]
+    fn no_claude_section_uses_default_model() {
+        let settings = load_project_settings("/nonexistent/path");
+        assert_eq!(settings.implement_model, DEFAULT_MODEL);
+        assert_eq!(settings.review_model, DEFAULT_MODEL);
     }
 }

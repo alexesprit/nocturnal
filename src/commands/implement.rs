@@ -68,6 +68,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         "implement",
         &slug,
         task_id,
+        &ctx.implement_model,
     )? {
         info!("Implementation completed");
         td.review(task_id).ok();
