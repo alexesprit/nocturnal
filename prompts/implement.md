@@ -31,7 +31,7 @@ Read the task title, description, acceptance criteria, and any previous handoff 
 
 Check if there are existing commits from a previous implementation attempt:
 ```bash
-git log --oneline main..HEAD
+git log --oneline $(git merge-base main HEAD)..HEAD
 ```
 
 If there are prior commits, review them to understand what was already done. Build on the existing work — focus specifically on addressing the rejection reason rather than starting from scratch.

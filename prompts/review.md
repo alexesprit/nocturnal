@@ -29,14 +29,14 @@ fi
 
 View the diff against the main branch:
 ```bash
-git log --oneline main..HEAD
-git diff main..HEAD
+git log --oneline $(git merge-base main HEAD)..HEAD
+git diff $(git merge-base main HEAD)..HEAD
 ```
 
 If the diff is large, review file by file:
 ```bash
-git diff main..HEAD --stat
-git diff main..HEAD -- <file>
+git diff $(git merge-base main HEAD)..HEAD --stat
+git diff $(git merge-base main HEAD)..HEAD -- <file>
 ```
 
 ### 2. Review Criteria
