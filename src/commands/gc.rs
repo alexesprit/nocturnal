@@ -6,6 +6,7 @@ use anyhow::Result;
 use tracing::info;
 
 use crate::config::ProjectContext;
+use crate::lock::is_process_alive;
 use crate::td;
 
 const TERMINAL_STATUSES: &[&str] = &["done", "approved", "blocked", "closed"];
@@ -146,13 +147,4 @@ fn gc_stale_locks(lock_dir: &str) -> Result<usize> {
     }
 
     Ok(removed)
-}
-
-fn is_process_alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
 }

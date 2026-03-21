@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 
 use anyhow::{Result, bail};
 use tracing::info;
@@ -47,11 +46,6 @@ impl Drop for Lock {
     }
 }
 
-fn is_process_alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
+pub(crate) fn is_process_alive(pid: u32) -> bool {
+    unsafe { libc::kill(pid as i32, 0) == 0 }
 }
