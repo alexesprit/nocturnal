@@ -68,7 +68,11 @@ ls -lt ${TMPDIR}/nocturnal-logs/
 Each project can have a `.nocturnal.toml` in its root. Top-level fields:
 - `max_reviews` — max review cycles before blocking a task (default `3`)
 - `max_budget` — max USD per Claude run; omit for no budget limit (default: unlimited)
-- `model` — Claude model to use (default `"sonnet"`)
+
+`[claude]` section (per-operation model config):
+- `model` — default Claude model for all operations (default `"sonnet"`)
+- `implement_model` — override model for implement/develop (falls back to `model`)
+- `review_model` — override model for review/proposal-review (falls back to `model`)
 
 `[vcs]` section:
 - `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.

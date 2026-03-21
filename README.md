@@ -183,8 +183,15 @@ max_reviews = 3
 # Max USD budget per Claude run; omit for no limit (default: unlimited)
 max_budget = 10
 
-# Claude model to use (default: "sonnet")
+[claude]
+# Default model for all operations (default: "sonnet")
 model = "sonnet"
+
+# Override model for implement/develop operations (optional, falls back to model)
+implement_model = "opus"
+
+# Override model for review/proposal-review operations (optional, falls back to model)
+review_model = "haiku"
 
 [vcs]
 # "auto"   — detect GitLab/GitHub from origin remote URL

@@ -53,12 +53,13 @@ pub fn run(
     command_name: &str,
     project: &str,
     task_id: &str,
+    model: &str,
 ) -> Result<bool> {
     fs::create_dir_all(&ctx.cfg.log_dir).ok();
 
     match ctx.max_budget {
-        Some(b) => info!("Running Claude (model={}, budget=${b})...", ctx.model),
-        None => info!("Running Claude (model={}, budget=unlimited)...", ctx.model),
+        Some(b) => info!("Running Claude (model={model}, budget=${b})..."),
+        None => info!("Running Claude (model={model}, budget=unlimited)..."),
     }
     info!("Log: {log_file}");
 
@@ -68,12 +69,7 @@ pub fn run(
     let output_file = fs::File::create(log_file).context("Failed to create log file")?;
     let stderr_file = output_file.try_clone()?;
 
-    let mut args = vec![
-        "-p",
-        "--dangerously-skip-permissions",
-        "--model",
-        &ctx.model,
-    ];
+    let mut args = vec!["-p", "--dangerously-skip-permissions", "--model", model];
     let budget_str;
     if let Some(b) = ctx.max_budget {
         budget_str = b.to_string();
