@@ -38,10 +38,9 @@ mod tests {
     }
 }
 
-pub fn worktree_path(project_root: &str, task_id: &str) -> Result<Option<String>> {
-    let branch = worktree_branch(task_id);
-    let target_ref = format!("refs/heads/{branch}");
-
+/// Parse `git worktree list --porcelain` and return `(worktree_path, task_id)` pairs
+/// for all worktrees on branches matching `refs/heads/nocturnal/<task_id>`.
+pub fn list_nocturnal_worktrees(project_root: &str) -> Result<Vec<(String, String)>> {
     let output = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
         .current_dir(project_root)
@@ -49,19 +48,28 @@ pub fn worktree_path(project_root: &str, task_id: &str) -> Result<Option<String>
         .context("Failed to list worktrees")?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut result = Vec::new();
+    let mut current_path: Option<String> = None;
 
-    let mut current_path: Option<&str> = None;
     for line in stdout.lines() {
         if let Some(path) = line.strip_prefix("worktree ") {
-            current_path = Some(path);
-        } else if let Some(branch_ref) = line.strip_prefix("branch ")
-            && branch_ref == target_ref
-        {
-            return Ok(current_path.map(|s| s.to_string()));
+            current_path = Some(path.to_string());
+        } else if let Some(task_id) = line.strip_prefix("branch refs/heads/nocturnal/") {
+            if let Some(path) = current_path.take() {
+                result.push((path, task_id.to_string()));
+            }
         }
     }
 
-    Ok(None)
+    Ok(result)
+}
+
+pub fn worktree_path(project_root: &str, task_id: &str) -> Result<Option<String>> {
+    let worktrees = list_nocturnal_worktrees(project_root)?;
+    Ok(worktrees
+        .into_iter()
+        .find(|(_, id)| id == task_id)
+        .map(|(path, _)| path))
 }
 
 fn fetch_main(project_root: &str) {

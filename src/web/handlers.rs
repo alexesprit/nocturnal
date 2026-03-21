@@ -308,25 +308,11 @@ fn fetch_project_status(
 }
 
 fn collect_worktree_task_ids(project_path: &str) -> Vec<String> {
-    let output = match std::process::Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(project_path)
-        .output()
-    {
-        Ok(o) if o.status.success() => o,
-        _ => return Vec::new(),
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut task_ids = Vec::new();
-
-    for line in stdout.lines() {
-        if let Some(branch_ref) = line.strip_prefix("branch refs/heads/nocturnal/") {
-            task_ids.push(branch_ref.to_string());
-        }
-    }
-
-    task_ids
+    crate::git::list_nocturnal_worktrees(project_path)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(_, task_id)| task_id)
+        .collect()
 }
 
 fn check_lock_status(lock_dir: &str, slug: &str) -> LockStatus {
@@ -566,31 +552,10 @@ fn derive_noc_state(
 }
 
 fn find_worktree_for_task(project_path: &str, task_id: &str) -> (Option<String>, Option<String>) {
-    let output = match std::process::Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(project_path)
-        .output()
-    {
-        Ok(o) if o.status.success() => o,
-        _ => return (None, None),
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let target_ref = format!("refs/heads/nocturnal/{task_id}");
-
-    let mut current_path: Option<String> = None;
-    for line in stdout.lines() {
-        if let Some(path) = line.strip_prefix("worktree ") {
-            current_path = Some(path.to_string());
-        } else if let Some(branch_ref) = line.strip_prefix("branch ") {
-            if branch_ref == target_ref {
-                let branch = format!("nocturnal/{task_id}");
-                return (current_path, Some(branch));
-            }
-        }
+    match crate::git::worktree_path(project_path, task_id) {
+        Ok(Some(path)) => (Some(path), Some(format!("nocturnal/{task_id}"))),
+        _ => (None, None),
     }
-
-    (None, None)
 }
 
 pub async fn project(

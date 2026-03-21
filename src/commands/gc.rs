@@ -6,6 +6,7 @@ use anyhow::Result;
 use tracing::info;
 
 use crate::config::ProjectContext;
+use crate::git;
 use crate::lock::is_process_alive;
 use crate::td;
 
@@ -22,7 +23,7 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
 }
 
 fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
-    let entries = list_nocturnal_worktrees(&ctx.project_root)?;
+    let entries = git::list_nocturnal_worktrees(&ctx.project_root)?;
     let td = td::Td::new(&ctx.project_root);
     let mut removed = 0;
 
@@ -75,33 +76,6 @@ fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
     }
 
     Ok(removed)
-}
-
-/// Parse `git worktree list --porcelain` and return (path, task_id) pairs for
-/// worktrees on branches matching `refs/heads/nocturnal/<task_id>`.
-fn list_nocturnal_worktrees(project_root: &str) -> Result<Vec<(String, String)>> {
-    let output = Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(project_root)
-        .output()?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut result = Vec::new();
-    let mut current_path: Option<String> = None;
-
-    for line in stdout.lines() {
-        if let Some(path) = line.strip_prefix("worktree ") {
-            current_path = Some(path.to_string());
-        } else if let Some(branch_ref) = line.strip_prefix("branch ") {
-            if let Some(task_id) = branch_ref.strip_prefix("refs/heads/nocturnal/") {
-                if let Some(path) = current_path.take() {
-                    result.push((path, task_id.to_string()));
-                }
-            }
-        }
-    }
-
-    Ok(result)
 }
 
 fn gc_stale_locks(lock_dir: &str) -> Result<usize> {
