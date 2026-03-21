@@ -8,6 +8,7 @@ mod project_config;
 mod prompt;
 mod td;
 mod usage;
+mod util;
 mod vcs;
 mod web;
 
