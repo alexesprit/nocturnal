@@ -43,8 +43,9 @@ fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
 
         info!("gc: removing worktree for {task_id} (status: {status}): {wt_path}");
 
+        let branch = format!("nocturnal/{task_id}");
         let rm_status = Command::new("git")
-            .args(["worktree", "remove", "--force", &wt_path])
+            .args(["gtr", "rm", &branch, "--delete-branch", "--force", "--yes"])
             .current_dir(&ctx.project_root)
             .status();
 
@@ -54,24 +55,11 @@ fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
                 removed += 1;
             }
             Ok(s) => {
-                info!("gc: git worktree remove failed for {wt_path} (exit: {s})");
+                info!("gc: git gtr rm failed for {wt_path} (exit: {s})");
             }
             Err(e) => {
-                info!("gc: git worktree remove error for {wt_path}: {e:#}");
+                info!("gc: git gtr rm error for {wt_path}: {e:#}");
             }
-        }
-
-        // Delete the local branch
-        let branch = format!("nocturnal/{task_id}");
-        let del_status = Command::new("git")
-            .args(["branch", "-D", &branch])
-            .current_dir(&ctx.project_root)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
-
-        if del_status.is_ok_and(|s| s.success()) {
-            info!("gc: deleted branch {branch}");
         }
     }
 
