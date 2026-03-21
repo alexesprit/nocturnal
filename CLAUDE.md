@@ -73,6 +73,7 @@ Each project can have a `.nocturnal.toml` in its root. Top-level fields:
 `[vcs]` section:
 - `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.
 - `auto_merge` — boolean (default `true`). When `false`, nocturnal creates the PR/MR but does not enable auto-merge.
+- `delete_branch_on_merge` — boolean (default `false`). When `true`, deletes the remote branch after a proposal is merged.
 
 ## Prompt Extras
 
