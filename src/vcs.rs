@@ -2,8 +2,8 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
-use crate::util::retry;
 use crate::project_config::VcsMode;
+use crate::util::retry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Platform {

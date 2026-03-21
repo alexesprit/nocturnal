@@ -34,7 +34,6 @@ pub fn run(cfg: &Config, addr: &str, port: u16) -> Result<()> {
 
     let state = Arc::new(AppState {
         projects,
-        td_binary: "td".to_string(),
         lock_dir: cfg.lock_dir.clone(),
         log_dir: cfg.log_dir.clone(),
         rotation_state_file: cfg.rotation_state_file.clone(),

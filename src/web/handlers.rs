@@ -14,7 +14,7 @@ use super::models::{
 };
 use crate::config;
 use crate::lock::is_process_alive;
-use crate::td::Task;
+use crate::td::{Task, Td};
 
 // --- Validation allowlists ---
 
@@ -161,13 +161,12 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
     let mut handles = Vec::new();
 
     for entry in &state.projects {
-        let td_binary = state.td_binary.clone();
         let path = entry.path.clone();
         let name = entry.name.clone();
         let lock_dir = lock_dir.clone();
         let max_reviews = entry.max_reviews;
         handles.push(tokio::task::spawn_blocking(move || {
-            fetch_project_status(&td_binary, &name, &path, &lock_dir, max_reviews)
+            fetch_project_status(&name, &path, &lock_dir, max_reviews)
         }));
     }
 
@@ -184,14 +183,8 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
         }
     }
 
-    let td_binary_for_orch = state.td_binary.clone();
     let orchestrator = tokio::task::spawn_blocking(move || {
-        fetch_orchestrator_status(
-            &rotation_state_file,
-            &log_dir,
-            &project_paths,
-            &td_binary_for_orch,
-        )
+        fetch_orchestrator_status(&rotation_state_file, &log_dir, &project_paths)
     })
     .await
     .unwrap();
@@ -207,107 +200,82 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
 }
 
 fn fetch_project_status(
-    td_binary: &str,
     name: &str,
     path: &str,
     lock_dir: &str,
     _max_reviews: u32,
 ) -> ProjectStatus {
-    let result = std::process::Command::new(td_binary)
-        .args(["-w", path, "list", "--json", "--all"])
-        .output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            let json = String::from_utf8_lossy(&output.stdout);
-            let tasks: Vec<Task> = match serde_json::from_str(&json) {
-                Ok(t) => t,
-                Err(e) => {
-                    warn!("failed to parse td output for {name}: {e}");
-                    Vec::new()
-                }
-            };
-
-            let mut counts = StatusCounts::default();
-            let mut noc_counts = NocTaskCounts::default();
-
-            for task in &tasks {
-                match task.status.as_str() {
-                    "open" => counts.open += 1,
-                    "in_progress" => counts.in_progress += 1,
-                    "blocked" => counts.blocked += 1,
-                    "in_review" => counts.in_review += 1,
-                    _ => {}
-                }
-
-                let has_noc_reviews = task.labels.iter().any(|l| l.starts_with("noc-reviews:"));
-                let has_proposal = task.labels.iter().any(|l| l.starts_with("noc-proposal:"));
-                let has_proposal_ready = task.labels.iter().any(|l| l == "noc-proposal-ready");
-
-                if has_proposal_ready && task.status != "closed" {
-                    noc_counts.proposal_ready += 1;
-                } else if has_proposal && task.status != "closed" {
-                    noc_counts.proposal_pending += 1;
-                } else if has_noc_reviews {
-                    match task.status.as_str() {
-                        "in_progress" => noc_counts.implementing += 1,
-                        "in_review" => noc_counts.reviewing += 1,
-                        _ => {}
-                    }
-                }
-            }
-
-            let total = counts.open + counts.in_progress + counts.blocked + counts.in_review;
-
-            let worktree_task_ids = collect_worktree_task_ids(path);
-            let slug = config::project_slug(path);
-            let lock_status = check_lock_status(lock_dir, &slug);
-
-            let lock_status_label = lock_status.label().to_string();
-            let lock_status_css = lock_status.css_class().to_string();
-            let worktree_count = worktree_task_ids.len();
-
-            let noc = Some(NocProjectStatus {
-                worktree_task_ids,
-                worktree_count,
-                lock_status,
-                lock_status_label,
-                lock_status_css,
-                counts: noc_counts,
-            });
-
-            ProjectStatus {
-                name: name.to_string(),
-                path: path.to_string(),
-                counts,
-                total,
-                error: None,
-                noc,
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            warn!("td list failed for {name}: {stderr}");
-            ProjectStatus {
-                name: name.to_string(),
-                path: path.to_string(),
-                counts: StatusCounts::default(),
-                total: 0,
-                error: Some(stderr.trim().to_string()),
-                noc: None,
-            }
-        }
+    let td = Td::new(path);
+    let tasks = match td.list_all() {
+        Ok(tasks) => tasks,
         Err(e) => {
-            error!("failed to run td for {name}: {e}");
-            ProjectStatus {
+            warn!("td list failed for {name}: {e}");
+            return ProjectStatus {
                 name: name.to_string(),
                 path: path.to_string(),
                 counts: StatusCounts::default(),
                 total: 0,
-                error: Some(format!("failed to run td: {e}")),
+                error: Some(e.to_string()),
                 noc: None,
+            };
+        }
+    };
+
+    let mut counts = StatusCounts::default();
+    let mut noc_counts = NocTaskCounts::default();
+
+    for task in &tasks {
+        match task.status.as_str() {
+            "open" => counts.open += 1,
+            "in_progress" => counts.in_progress += 1,
+            "blocked" => counts.blocked += 1,
+            "in_review" => counts.in_review += 1,
+            _ => {}
+        }
+
+        let has_noc_reviews = task.labels.iter().any(|l| l.starts_with("noc-reviews:"));
+        let has_proposal = task.labels.iter().any(|l| l.starts_with("noc-proposal:"));
+        let has_proposal_ready = task.labels.iter().any(|l| l == "noc-proposal-ready");
+
+        if has_proposal_ready && task.status != "closed" {
+            noc_counts.proposal_ready += 1;
+        } else if has_proposal && task.status != "closed" {
+            noc_counts.proposal_pending += 1;
+        } else if has_noc_reviews {
+            match task.status.as_str() {
+                "in_progress" => noc_counts.implementing += 1,
+                "in_review" => noc_counts.reviewing += 1,
+                _ => {}
             }
         }
+    }
+
+    let total = counts.open + counts.in_progress + counts.blocked + counts.in_review;
+
+    let worktree_task_ids = collect_worktree_task_ids(path);
+    let slug = config::project_slug(path);
+    let lock_status = check_lock_status(lock_dir, &slug);
+
+    let lock_status_label = lock_status.label().to_string();
+    let lock_status_css = lock_status.css_class().to_string();
+    let worktree_count = worktree_task_ids.len();
+
+    let noc = Some(NocProjectStatus {
+        worktree_task_ids,
+        worktree_count,
+        lock_status,
+        lock_status_label,
+        lock_status_css,
+        counts: noc_counts,
+    });
+
+    ProjectStatus {
+        name: name.to_string(),
+        path: path.to_string(),
+        counts,
+        total,
+        error: None,
+        noc,
     }
 }
 
@@ -353,7 +321,6 @@ fn fetch_orchestrator_status(
     rotation_state_file: &str,
     log_dir: &str,
     projects: &[(String, String)],
-    td_binary: &str,
 ) -> OrchestratorStatus {
     let (current_project, next_project) = read_rotation_state(rotation_state_file, projects);
 
@@ -362,7 +329,7 @@ fn fetch_orchestrator_status(
             .iter()
             .find(|(n, _)| n == name)
             .map(|(_, p)| p.as_str())?;
-        fetch_next_task(td_binary, path)
+        fetch_next_task(path)
     });
 
     let recent_logs = crate::activity::read_recent(log_dir, 5)
@@ -384,15 +351,15 @@ fn fetch_orchestrator_status(
     }
 }
 
-fn fetch_next_task(td_binary: &str, project_path: &str) -> Option<NextTask> {
-    let td = crate::td::Td::new(project_path);
+fn fetch_next_task(project_path: &str) -> Option<NextTask> {
+    let td = Td::new(project_path);
     let vcs_mode = crate::project_config::load_vcs_mode(project_path);
     let check_proposals = crate::vcs::detect_platform(project_path, vcs_mode).is_some();
     let action = td.get_next_action(check_proposals).ok()?;
 
     let task_id = action.task_id()?;
     let action_label = action.label().to_string();
-    let detail = run_td_show(td_binary, project_path, task_id).ok()?;
+    let detail = td.show_detail(task_id).ok()?;
     Some(NextTask {
         action: action_label,
         id: detail.id,
@@ -574,19 +541,14 @@ pub async fn project(
 
     let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
 
-    let td_binary = state.td_binary.clone();
     let path = entry.path.clone();
     let project_name = name.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        run_td_list(
-            &td_binary,
-            &path,
-            &ListOpts {
-                sort: Some("priority".to_string()),
-                ..Default::default()
-            },
-        )
+        Td::new(&path).list(&ListOpts {
+            sort: Some("priority".to_string()),
+            ..Default::default()
+        })
     })
     .await;
 
@@ -668,11 +630,10 @@ pub async fn project_issues(
         all: false,
     };
 
-    let td_binary = state.td_binary.clone();
     let path = entry.path.clone();
     let project_name = name.clone();
 
-    let result = tokio::task::spawn_blocking(move || run_td_list(&td_binary, &path, &opts)).await;
+    let result = tokio::task::spawn_blocking(move || Td::new(&path).list(&opts)).await;
 
     match result {
         Ok(Ok(issues)) => {
@@ -754,16 +715,16 @@ pub async fn issue(
         None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
     };
 
-    let td_binary = state.td_binary.clone();
     let path = entry.path.clone();
     let project_name = name.clone();
     let issue_id = id.clone();
     let max_reviews = entry.max_reviews;
 
     let result = tokio::task::spawn_blocking(move || {
-        let mut detail = run_td_show(&td_binary, &path, &issue_id)?;
-        detail.depends_on = run_td_depends_on(&td_binary, &path, &issue_id);
-        detail.blocked_by = run_td_blocked_by(&td_binary, &path, &issue_id);
+        let td = Td::new(&path);
+        let mut detail = td.show_detail(&issue_id)?;
+        detail.depends_on = td.depends_on(&issue_id);
+        detail.blocked_by = td.blocked_by(&issue_id);
         let noc_state = derive_noc_state(
             &detail.labels,
             &detail.status,
@@ -826,132 +787,6 @@ fn group_by_status(issues: Vec<Task>) -> (Vec<Task>, Vec<Task>, Vec<Task>, Vec<T
         }
     }
     (open, in_progress, blocked, in_review)
-}
-
-// --- td CLI wrappers ---
-
-fn run_td_list(td_binary: &str, project_path: &str, opts: &ListOpts) -> anyhow::Result<Vec<Task>> {
-    let mut args = vec!["list", "--json", "-w", project_path];
-
-    if opts.all {
-        args.push("--all");
-    }
-
-    // We need to own these strings for the lifetime of the command
-    let status_val;
-    if let Some(ref s) = opts.status {
-        if s != "all" {
-            status_val = s.clone();
-            args.push("--status");
-            args.push(&status_val);
-        }
-    }
-
-    let priority_val;
-    if let Some(ref p) = opts.priority {
-        if p != "all" {
-            priority_val = p.clone();
-            args.push("--priority");
-            args.push(&priority_val);
-        }
-    }
-
-    let type_val;
-    if let Some(ref t) = opts.task_type {
-        if t != "all" {
-            type_val = t.clone();
-            args.push("--type");
-            args.push(&type_val);
-        }
-    }
-
-    let query_val;
-    if let Some(ref q) = opts.query {
-        query_val = q.clone();
-        args.push("-q");
-        args.push(&query_val);
-    }
-
-    let sort_val;
-    if let Some(ref s) = opts.sort {
-        sort_val = s.clone();
-        args.push("--sort");
-        args.push(&sort_val);
-    }
-
-    let output = std::process::Command::new(td_binary)
-        .args(&args)
-        .output()
-        .map_err(|e| anyhow::anyhow!("failed to run td: {e}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("td list failed: {}", stderr.trim());
-    }
-
-    let json = String::from_utf8_lossy(&output.stdout);
-    let tasks: Vec<Task> = serde_json::from_str::<Option<Vec<Task>>>(&json)?.unwrap_or_default();
-    Ok(tasks)
-}
-
-fn run_td_depends_on(td_binary: &str, project_path: &str, issue_id: &str) -> Vec<String> {
-    let output = std::process::Command::new(td_binary)
-        .args(["depends-on", issue_id, "--json", "-w", project_path])
-        .output();
-    let Ok(output) = output else { return vec![] };
-    if !output.status.success() {
-        return vec![];
-    }
-    let json = String::from_utf8_lossy(&output.stdout);
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
-        return vec![];
-    };
-    value["dependencies"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn run_td_blocked_by(td_binary: &str, project_path: &str, issue_id: &str) -> Vec<String> {
-    let output = std::process::Command::new(td_binary)
-        .args(["blocked-by", issue_id, "--json", "-w", project_path])
-        .output();
-    let Ok(output) = output else { return vec![] };
-    if !output.status.success() {
-        return vec![];
-    }
-    let json = String::from_utf8_lossy(&output.stdout);
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
-        return vec![];
-    };
-    value["direct"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v["id"].as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn run_td_show(td_binary: &str, project_path: &str, issue_id: &str) -> anyhow::Result<IssueDetail> {
-    let output = std::process::Command::new(td_binary)
-        .args(["show", issue_id, "--json", "-w", project_path])
-        .output()
-        .map_err(|e| anyhow::anyhow!("failed to run td: {e}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("td show failed: {}", stderr.trim());
-    }
-
-    let json = String::from_utf8_lossy(&output.stdout);
-    let detail: IssueDetail = serde_json::from_str(&json)?;
-    Ok(detail)
 }
 
 // --- API handlers ---
