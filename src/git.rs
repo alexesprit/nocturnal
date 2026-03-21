@@ -21,6 +21,10 @@ where
 const WORKTREE_PREFIX: &str = "nocturnal";
 
 pub fn worktree_branch(task_id: &str) -> String {
+    debug_assert!(
+        crate::td::validate_task_id(task_id).is_ok(),
+        "task_id must be validated before constructing branch name: {task_id:?}"
+    );
     format!("{WORKTREE_PREFIX}/{task_id}")
 }
 
@@ -31,16 +35,6 @@ mod tests {
     #[test]
     fn worktree_branch_format() {
         assert_eq!(worktree_branch("task-42"), "nocturnal/task-42");
-    }
-
-    #[test]
-    fn worktree_branch_with_slashes_in_id() {
-        assert_eq!(worktree_branch("sub/task"), "nocturnal/sub/task");
-    }
-
-    #[test]
-    fn worktree_branch_empty_id() {
-        assert_eq!(worktree_branch(""), "nocturnal/");
     }
 }
 

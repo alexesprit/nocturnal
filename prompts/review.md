@@ -67,10 +67,7 @@ Run the project's validation commands (check `CLAUDE.md` for build, lint, typech
 
 ### 4. Make Your Decision
 
-**Approve** if the implementation is correct, follows conventions, and meets acceptance criteria:
-```bash
-td update {{TASK_ID}} --labels "noc-proposal-ready" -w "{{PROJECT_ROOT}}"
-```
+**Approve** if the implementation is correct, follows conventions, and meets acceptance criteria. Do nothing — just finish your review. The orchestrator will detect approval automatically.
 
 **Reject** if there are issues that must be fixed. Be specific about what needs to change:
 ```bash

@@ -4,6 +4,19 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Deserializer};
 use tracing::debug;
 
+/// Validates a task ID against `^[a-zA-Z0-9_-]+$`.
+/// Returns an error for IDs that could cause path traversal or flag injection.
+pub(crate) fn validate_task_id(id: &str) -> Result<()> {
+    if id.is_empty()
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        bail!("invalid task ID: {:?}", id);
+    }
+    Ok(())
+}
+
 pub(crate) fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
@@ -111,13 +124,23 @@ impl<'a> Td<'a> {
 
     pub fn list_by_status(&self, status: &str) -> Result<Vec<Task>> {
         let json = self.run(&["list", "--json", "--status", status])?;
-        Ok(serde_json::from_str(&json).unwrap_or_default())
+        let tasks: Vec<Task> = serde_json::from_str(&json).unwrap_or_default();
+        Ok(tasks
+            .into_iter()
+            .filter(|t| validate_task_id(&t.id).is_ok())
+            .collect())
     }
 
     pub fn get_next_task_id(&self) -> Result<Option<String>> {
         let output = self.run(&["next"]);
         match output {
-            Ok(stdout) => Ok(stdout.split_whitespace().next().map(|s| s.to_string())),
+            Ok(stdout) => {
+                let id = stdout.split_whitespace().next().map(|s| s.to_string());
+                if let Some(ref task_id) = id {
+                    validate_task_id(task_id)?;
+                }
+                Ok(id)
+            }
             Err(_) => Ok(None),
         }
     }
@@ -301,6 +324,34 @@ pub fn swap_labels(task: &Task, remove_prefixes: &[&str], add_label: Option<&str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- validate_task_id ---
+
+    #[test]
+    fn validate_task_id_accepts_valid_ids() {
+        assert!(validate_task_id("td-24a7b3").is_ok());
+        assert!(validate_task_id("task_1").is_ok());
+        assert!(validate_task_id("ABC123").is_ok());
+        assert!(validate_task_id("a").is_ok());
+    }
+
+    #[test]
+    fn validate_task_id_rejects_empty() {
+        assert!(validate_task_id("").is_err());
+    }
+
+    #[test]
+    fn validate_task_id_rejects_path_traversal() {
+        assert!(validate_task_id("../etc/passwd").is_err());
+        assert!(validate_task_id("foo/bar").is_err());
+    }
+
+    #[test]
+    fn validate_task_id_rejects_spaces_and_special_chars() {
+        assert!(validate_task_id("task 1").is_err());
+        assert!(validate_task_id("task\n1").is_err());
+        assert!(validate_task_id("task;rm").is_err());
+    }
 
     fn task_with_labels(labels: &[&str]) -> Task {
         Task {

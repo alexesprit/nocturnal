@@ -13,6 +13,7 @@ use super::models::{
     NocTaskCounts, OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
 };
 use crate::config;
+use crate::lock::is_process_alive;
 use crate::td::Task;
 
 // --- Validation allowlists ---
@@ -41,10 +42,7 @@ fn sanitize_param(value: &str, allowed: &[&str]) -> Option<String> {
 }
 
 fn is_valid_issue_id(id: &str) -> bool {
-    !id.is_empty()
-        && id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    crate::td::validate_task_id(id).is_ok()
 }
 
 // --- Askama templates ---
@@ -361,15 +359,6 @@ fn check_lock_status(lock_dir: &str, slug: &str) -> LockStatus {
     }
 }
 
-fn is_process_alive(pid: u32) -> bool {
-    std::process::Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
-}
-
 fn fetch_orchestrator_status(
     rotation_state_file: &str,
     log_dir: &str,
@@ -614,8 +603,7 @@ pub async fn project(
         None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
     };
 
-    let view = sanitize_param(&params.view, ALLOWED_VIEWS)
-        .unwrap_or_else(|| "table".to_string());
+    let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
 
     let td_binary = state.td_binary.clone();
     let path = entry.path.clone();
@@ -689,8 +677,7 @@ pub async fn project_issues(
 
     let is_htmx = headers.get("HX-Request").is_some();
 
-    let view = sanitize_param(&params.view, ALLOWED_VIEWS)
-        .unwrap_or_else(|| "table".to_string());
+    let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
 
     const MAX_QUERY_LEN: usize = 200;
     let query = if params.q.is_empty()
@@ -723,7 +710,13 @@ pub async fn project_issues(
             if is_htmx {
                 if view == "kanban" {
                     let (open, in_progress, blocked, in_review) = group_by_status(issues);
-                    let tmpl = KanbanBoardTemplate { name, open, in_progress, blocked, in_review };
+                    let tmpl = KanbanBoardTemplate {
+                        name,
+                        open,
+                        in_progress,
+                        blocked,
+                        in_review,
+                    };
                     into_html_response(tmpl)
                 } else {
                     let tmpl = TableWrapperTemplate { name, issues };

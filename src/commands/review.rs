@@ -91,7 +91,11 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
 
     if task.labels.iter().any(|l| l.starts_with("noc-proposal:")) {
         info!("Task {task_id} already has an open proposal — skipping re-review");
-    } else if task.labels.iter().any(|l| l == "noc-proposal-ready") {
+    } else if task.status == "in_review" {
+        // LLM approved — add label programmatically and create proposal
+        info!("Task {task_id} approved — adding noc-proposal-ready label");
+        let labels = td::swap_label(&task, "noc-proposal-ready", Some("noc-proposal-ready"));
+        td_client.update_labels(task_id, &labels)?;
         info!("Task {task_id} passed internal review — creating proposal");
         super::proposal_review::create_proposal(ctx, task_id)?;
     } else if task.status == "open" {

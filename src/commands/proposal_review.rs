@@ -50,6 +50,14 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             vcs::ProposalState::Merged => {
                 info!("Proposal #{proposal_id} merged — approving task");
                 td_client.approve(&task_id)?;
+                if ctx.delete_branch_on_merge {
+                    let branch = git::worktree_branch(&task_id);
+                    if vcs::delete_remote_branch(&wt_path, &branch) {
+                        info!("Remote branch {branch} deleted");
+                    } else {
+                        info!("Remote branch deletion failed (best-effort)");
+                    }
+                }
                 continue;
             }
             vcs::ProposalState::Closed => {
@@ -102,7 +110,9 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             vcs::Platform::GitLab => "",
         };
         let vcs_resolve_rule = match platform {
-            vcs::Platform::GitHub => "- Resolve inline review threads after addressing them (as described in step 3); do NOT dismiss threads without addressing them",
+            vcs::Platform::GitHub => {
+                "- Resolve inline review threads after addressing them (as described in step 3); do NOT dismiss threads without addressing them"
+            }
             vcs::Platform::GitLab => "",
         };
         let mut rendered = prompt::render_with_vcs(

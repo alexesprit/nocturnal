@@ -9,6 +9,10 @@ use crate::activity;
 use crate::config::ProjectContext;
 
 pub fn log_path(log_dir: &str, command: &str, task_id: &str) -> String {
+    debug_assert!(
+        crate::td::validate_task_id(task_id).is_ok(),
+        "task_id must be validated before constructing log path: {task_id:?}"
+    );
     format!(
         "{}/{}-{}-{}.log",
         log_dir,

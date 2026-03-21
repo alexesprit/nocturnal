@@ -899,6 +899,7 @@ dependencies = [
  "axum",
  "chrono",
  "clap",
+ "libc",
  "pulldown-cmark",
  "rust-embed",
  "serde",
