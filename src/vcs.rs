@@ -135,6 +135,23 @@ pub fn create_proposal(
     })
 }
 
+pub fn delete_remote_branch(wt_path: &str, branch: &str) -> bool {
+    retry(|| {
+        let status = Command::new("git")
+            .args(["push", "origin", "--delete", branch])
+            .current_dir(wt_path)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        match status {
+            Ok(s) if s.success() => Ok(()),
+            Ok(s) => bail!("git push --delete exited with status {s}"),
+            Err(e) => Err(anyhow::Error::from(e)),
+        }
+    })
+    .is_ok()
+}
+
 pub fn enable_auto_merge(platform: Platform, wt_path: &str, proposal_id: &str) -> bool {
     retry(|| {
         let status = match platform {
