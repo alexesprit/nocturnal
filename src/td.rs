@@ -55,6 +55,98 @@ pub struct Task {
     pub parent_id: String,
 }
 
+/// Detailed view of a task, as returned by `td show --json`.
+#[allow(dead_code)] // fields used by askama templates
+#[derive(Debug, Deserialize)]
+pub struct IssueDetail {
+    pub id: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub title: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub status: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub priority: String,
+    #[serde(rename = "type", default, deserialize_with = "null_as_default")]
+    pub issue_type: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub points: Option<i32>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub sprint: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub description: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub acceptance: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub created_at: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub updated_at: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub closed_at: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub defer_date: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub due_date: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub parent_id: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub children: Vec<Task>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub depends_on: Vec<String>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub blocked_by: Vec<String>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub comments: Vec<Comment>,
+    #[serde(rename = "logs", default, deserialize_with = "null_as_default")]
+    pub activity: Vec<ActivityEntry>,
+}
+
+#[allow(dead_code)] // fields used by askama templates
+#[derive(Debug, Deserialize)]
+pub struct Comment {
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub author: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub body: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub created: String,
+}
+
+#[allow(dead_code)] // fields used by askama templates
+#[derive(Debug, Deserialize)]
+pub struct ActivityEntry {
+    #[serde(rename = "type", default, deserialize_with = "null_as_default")]
+    pub action: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub timestamp: String,
+    #[serde(rename = "message", default, deserialize_with = "null_as_default")]
+    pub details: String,
+}
+
+/// Options for filtering and sorting `td list` output.
+pub struct ListOpts {
+    pub status: Option<String>,
+    pub priority: Option<String>,
+    pub task_type: Option<String>,
+    pub query: Option<String>,
+    pub sort: Option<String>,
+    pub all: bool,
+}
+
+impl Default for ListOpts {
+    fn default() -> Self {
+        Self {
+            status: None,
+            priority: None,
+            task_type: None,
+            query: None,
+            sort: Some("priority".to_string()),
+            all: false,
+        }
+    }
+}
+
 pub struct Td<'a> {
     project_root: &'a str,
 }
@@ -120,6 +212,106 @@ impl<'a> Td<'a> {
     pub fn show(&self, task_id: &str) -> Result<Task> {
         let json = self.run(&["show", task_id, "--json"])?;
         serde_json::from_str(&json).context("Failed to parse task JSON")
+    }
+
+    pub fn show_detail(&self, issue_id: &str) -> Result<IssueDetail> {
+        let json = self.run(&["show", issue_id, "--json"])?;
+        serde_json::from_str(&json).context("Failed to parse issue detail JSON")
+    }
+
+    pub fn list_all(&self) -> Result<Vec<Task>> {
+        let json = self.run(&["list", "--json", "--all"])?;
+        let tasks: Vec<Task> =
+            serde_json::from_str::<Option<Vec<Task>>>(&json)?.unwrap_or_default();
+        Ok(tasks)
+    }
+
+    pub fn list(&self, opts: &ListOpts) -> Result<Vec<Task>> {
+        let mut args = vec!["list", "--json"];
+
+        if opts.all {
+            args.push("--all");
+        }
+
+        let status_val;
+        if let Some(ref s) = opts.status {
+            if s != "all" {
+                status_val = s.clone();
+                args.push("--status");
+                args.push(&status_val);
+            }
+        }
+
+        let priority_val;
+        if let Some(ref p) = opts.priority {
+            if p != "all" {
+                priority_val = p.clone();
+                args.push("--priority");
+                args.push(&priority_val);
+            }
+        }
+
+        let type_val;
+        if let Some(ref t) = opts.task_type {
+            if t != "all" {
+                type_val = t.clone();
+                args.push("--type");
+                args.push(&type_val);
+            }
+        }
+
+        let query_val;
+        if let Some(ref q) = opts.query {
+            query_val = q.clone();
+            args.push("-q");
+            args.push(&query_val);
+        }
+
+        let sort_val;
+        if let Some(ref s) = opts.sort {
+            sort_val = s.clone();
+            args.push("--sort");
+            args.push(&sort_val);
+        }
+
+        let json = self.run(&args)?;
+        let tasks: Vec<Task> =
+            serde_json::from_str::<Option<Vec<Task>>>(&json)?.unwrap_or_default();
+        Ok(tasks)
+    }
+
+    pub fn depends_on(&self, issue_id: &str) -> Vec<String> {
+        let Ok(json) = self.run(&["depends-on", issue_id, "--json"]) else {
+            return vec![];
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
+            return vec![];
+        };
+        value["dependencies"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn blocked_by(&self, issue_id: &str) -> Vec<String> {
+        let Ok(json) = self.run(&["blocked-by", issue_id, "--json"]) else {
+            return vec![];
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
+            return vec![];
+        };
+        value["direct"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v["id"].as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     pub fn list_by_status(&self, status: &str) -> Result<Vec<Task>> {

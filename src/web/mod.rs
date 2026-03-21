@@ -22,7 +22,6 @@ pub struct ProjectEntry {
 
 pub struct AppState {
     pub projects: Vec<ProjectEntry>,
-    pub td_binary: String,
     pub lock_dir: String,
     pub log_dir: String,
     pub rotation_state_file: String,
