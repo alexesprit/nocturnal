@@ -21,6 +21,7 @@ pub enum VcsMode {
 struct VcsConfig {
     mode: Option<VcsMode>,
     auto_merge: Option<bool>,
+    delete_branch_on_merge: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +35,7 @@ struct ProjectConfig {
 pub struct ProjectSettings {
     pub vcs_mode: VcsMode,
     pub auto_merge: bool,
+    pub delete_branch_on_merge: bool,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
     pub model: String,
@@ -55,6 +57,7 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
             ProjectSettings {
                 vcs_mode: vcs.mode.unwrap_or_default(),
                 auto_merge: vcs.auto_merge.unwrap_or(true),
+                delete_branch_on_merge: vcs.delete_branch_on_merge.unwrap_or(false),
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
                 model: f.model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
@@ -72,6 +75,7 @@ impl Default for ProjectSettings {
         ProjectSettings {
             vcs_mode: VcsMode::default(),
             auto_merge: true,
+            delete_branch_on_merge: false,
             max_reviews: DEFAULT_MAX_REVIEWS,
             max_budget: DEFAULT_MAX_BUDGET,
             model: DEFAULT_MODEL.to_string(),
@@ -162,6 +166,35 @@ mod tests {
         let vcs = f.vcs.unwrap();
         assert_eq!(vcs.mode.unwrap_or_default(), VcsMode::Off);
         assert!(!vcs.auto_merge.unwrap());
+    }
+
+    #[test]
+    fn delete_branch_on_merge_defaults_to_false() {
+        let settings = load_project_settings("/nonexistent/path");
+        assert!(!settings.delete_branch_on_merge);
+    }
+
+    #[test]
+    fn parse_delete_branch_on_merge_true() {
+        let f: ProjectConfig =
+            toml::from_str("[vcs]\nmode = \"github\"\ndelete_branch_on_merge = true").unwrap();
+        let vcs = f.vcs.unwrap();
+        assert!(vcs.delete_branch_on_merge.unwrap());
+    }
+
+    #[test]
+    fn parse_delete_branch_on_merge_false() {
+        let f: ProjectConfig =
+            toml::from_str("[vcs]\nmode = \"github\"\ndelete_branch_on_merge = false").unwrap();
+        let vcs = f.vcs.unwrap();
+        assert!(!vcs.delete_branch_on_merge.unwrap());
+    }
+
+    #[test]
+    fn empty_vcs_section_delete_branch_on_merge_is_none() {
+        let f: ProjectConfig = toml::from_str("[vcs]").unwrap();
+        let vcs = f.vcs.unwrap();
+        assert!(vcs.delete_branch_on_merge.is_none());
     }
 
     #[test]
