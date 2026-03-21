@@ -1,24 +1,9 @@
 use std::process::Command;
-use std::thread;
-use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 
+use crate::util::retry;
 use crate::project_config::VcsMode;
-
-fn retry<F, T>(f: F) -> Result<T>
-where
-    F: Fn() -> Result<T>,
-{
-    match f() {
-        Ok(val) => Ok(val),
-        Err(err) => {
-            tracing::warn!("VCS command failed, retrying in 3s: {err}");
-            thread::sleep(Duration::from_secs(3));
-            f()
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Platform {
@@ -64,7 +49,7 @@ pub fn create_proposal(
     title: &str,
     description: &str,
 ) -> Result<Proposal> {
-    retry(|| match platform {
+    retry("VCS", || match platform {
         Platform::GitLab => {
             let output = Command::new("glab")
                 .args([
@@ -136,7 +121,7 @@ pub fn create_proposal(
 }
 
 pub fn delete_remote_branch(wt_path: &str, branch: &str) -> bool {
-    retry(|| {
+    retry("VCS", || {
         let status = Command::new("git")
             .args(["push", "origin", "--delete", branch])
             .current_dir(wt_path)
@@ -153,7 +138,7 @@ pub fn delete_remote_branch(wt_path: &str, branch: &str) -> bool {
 }
 
 pub fn enable_auto_merge(platform: Platform, wt_path: &str, proposal_id: &str) -> bool {
-    retry(|| {
+    retry("VCS", || {
         let status = match platform {
             Platform::GitLab => Command::new("glab")
                 .args(["mr", "merge", proposal_id, "--auto", "--yes"])
@@ -189,7 +174,7 @@ pub fn get_proposal_state(
     wt_path: &str,
     proposal_id: &str,
 ) -> Result<ProposalState> {
-    retry(|| {
+    retry("VCS", || {
         let state_str = match platform {
             Platform::GitLab => {
                 let output = Command::new("glab")
@@ -234,7 +219,7 @@ pub fn fetch_unresolved_comments(
     wt_path: &str,
     proposal_id: &str,
 ) -> Result<String> {
-    retry(|| match platform {
+    retry("VCS", || match platform {
         Platform::GitLab => {
             let output = Command::new("glab")
                 .args([
