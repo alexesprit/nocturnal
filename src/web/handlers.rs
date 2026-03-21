@@ -185,12 +185,16 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
     }
 
     let td_binary_for_orch = state.td_binary.clone();
-    let orchestrator = fetch_orchestrator_status(
-        &rotation_state_file,
-        &log_dir,
-        &project_paths,
-        &td_binary_for_orch,
-    );
+    let orchestrator = tokio::task::spawn_blocking(move || {
+        fetch_orchestrator_status(
+            &rotation_state_file,
+            &log_dir,
+            &project_paths,
+            &td_binary_for_orch,
+        )
+    })
+    .await
+    .unwrap();
 
     let tmpl = DashboardTemplate {
         title: "Dashboard".to_string(),
@@ -953,13 +957,17 @@ fn run_td_show(td_binary: &str, project_path: &str, issue_id: &str) -> anyhow::R
 // --- API handlers ---
 
 pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
-    let is_running = state.projects.iter().any(|p| {
-        let slug = crate::config::project_slug(&p.path);
-        matches!(
-            check_lock_status(&state.lock_dir, &slug),
-            LockStatus::Running(_)
-        )
-    });
+    let lock_dir = state.lock_dir.clone();
+    let project_paths_for_lock: Vec<String> =
+        state.projects.iter().map(|p| p.path.clone()).collect();
+    let is_running = tokio::task::spawn_blocking(move || {
+        project_paths_for_lock.iter().any(|path| {
+            let slug = crate::config::project_slug(path);
+            matches!(check_lock_status(&lock_dir, &slug), LockStatus::Running(_))
+        })
+    })
+    .await
+    .unwrap();
 
     if is_running {
         return Html(
@@ -1007,7 +1015,11 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
     };
 
     let slug = crate::config::project_slug(&entry.path);
-    let lock_status = check_lock_status(&state.lock_dir, &slug);
+    let lock_dir_for_check = state.lock_dir.clone();
+    let lock_status =
+        tokio::task::spawn_blocking(move || check_lock_status(&lock_dir_for_check, &slug))
+            .await
+            .unwrap();
     let project_path = entry.path.clone();
 
     if matches!(lock_status, LockStatus::Running(_)) {
