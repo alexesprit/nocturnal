@@ -102,7 +102,9 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             vcs::Platform::GitLab => "",
         };
         let vcs_resolve_rule = match platform {
-            vcs::Platform::GitHub => "- Resolve inline review threads after addressing them (as described in step 3); do NOT dismiss threads without addressing them",
+            vcs::Platform::GitHub => {
+                "- Resolve inline review threads after addressing them (as described in step 3); do NOT dismiss threads without addressing them"
+            }
             vcs::Platform::GitLab => "",
         };
         let mut rendered = prompt::render_with_vcs(
