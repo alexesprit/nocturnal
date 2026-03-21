@@ -47,10 +47,15 @@ Claude runs `cd`'d into the worktree. All `td` commands in prompts use `-w "{{PR
 
 ## Testing
 
-No automated tests. Test manually against a repo with `td init`:
+Unit tests exist in `config.rs`, `project_config.rs`, `prompt.rs`, `td.rs`, and `claude.rs`. Run them with:
+```bash
+cargo test
+```
+
+For manual integration testing against a repo with `td init`:
 ```bash
 cd /path/to/repo-with-td-init
-/path/to/nocturnal implement    # or: review, develop
+/path/to/nocturnal implement    # or: review, develop, proposal, gc
 ```
 
 Logs go to `$TMPDIR/nocturnal-logs/`. Check with:
@@ -60,10 +65,24 @@ ls -lt ${TMPDIR}/nocturnal-logs/
 
 ## Per-Project Configuration
 
-Each project can have a `.nocturnal.toml` in its root. Currently supports:
-- `[vcs]` section:
-  - `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.
-  - `auto_merge` — boolean (default `true`). When `false`, nocturnal creates the PR/MR but does not enable auto-merge.
+Each project can have a `.nocturnal.toml` in its root. Top-level fields:
+- `max_reviews` — max review cycles before blocking a task (default `3`)
+- `max_budget` — max USD per Claude run; omit for no budget limit (default: unlimited)
+- `model` — Claude model to use (default `"sonnet"`)
+
+`[vcs]` section:
+- `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.
+- `auto_merge` — boolean (default `true`). When `false`, nocturnal creates the PR/MR but does not enable auto-merge.
+
+## Prompt Extras
+
+Prompt content can be extended per project without modifying the built-in templates. Place files in `.nocturnal/` at the project root:
+- `prompt-extra.md` — appended to **all** templates
+- `prompt-implement.md` — appended to the implement template only
+- `prompt-review.md` — appended to the review template only
+- `prompt-proposal-review.md` — appended to the proposal-review template only
+
+Shared content is appended before template-specific content.
 
 ## Rust Conventions
 

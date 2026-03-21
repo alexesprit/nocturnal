@@ -162,18 +162,42 @@ Proposal review every hour (`~/Library/LaunchAgents/com.nocturnal.proposal-revie
 
 ## Configuration
 
-All configuration is via environment variables:
+### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NOCTURNAL_MAX_REVIEWS` | `3` | Max review cycles before blocking a task |
-| `NOCTURNAL_MAX_BUDGET` | `5` | Max USD per Claude run |
-| `NOCTURNAL_MODEL` | `sonnet` | Claude model to use |
 | `NOCTURNAL_LOG_DIR` | `$TMPDIR/nocturnal-logs` | Log output directory |
 | `NOCTURNAL_LOCK_DIR` | `$TMPDIR` | Lock file directory |
 | `NOCTURNAL_PROJECTS` | — | Colon-separated project paths (alternative to projects file) |
 | `NOCTURNAL_PROJECTS_FILE` | `~/.config/nocturnal/projects` | Project list file |
 | `NOCTURNAL_ROTATION_STATE` | `~/.config/nocturnal/rotation-state` | Rotation index persistence |
+
+### Per-Project Configuration
+
+Each project can have a `.nocturnal.toml` in its root:
+
+```toml
+# Max review cycles before blocking a task for human attention (default: 3)
+max_reviews = 3
+
+# Max USD budget per Claude run; omit for no limit (default: unlimited)
+max_budget = 10
+
+# Claude model to use (default: "sonnet")
+model = "sonnet"
+
+[vcs]
+# "auto"   — detect GitLab/GitHub from origin remote URL
+# "github" — force GitHub
+# "gitlab" — force GitLab
+# "off"    — no proposals (default if section is missing)
+mode = "auto"
+
+# Enable auto-merge on created proposals (default: true)
+# Set to false if your repo has no branch protection rules,
+# otherwise the PR/MR will be merged immediately on creation.
+auto_merge = false
+```
 
 ## Task Lifecycle
 
@@ -195,21 +219,7 @@ nocturnal tracks state through `td` statuses and labels:
 
 ## VCS Integration
 
-VCS integration is configured per project via `.nocturnal.toml` in the project root:
-
-```toml
-[vcs]
-# "auto"   — detect GitLab/GitHub from origin remote URL
-# "github" — force GitHub
-# "gitlab" — force GitLab
-# "off"    — no proposals (default if section is missing)
-mode = "auto"
-
-# Enable auto-merge on created proposals (default: true)
-# Set to false if your repo has no branch protection rules,
-# otherwise the PR/MR will be merged immediately on creation.
-auto_merge = false
-```
+VCS integration is configured per project via the `[vcs]` section in `.nocturnal.toml` (see [Per-Project Configuration](#per-project-configuration) above).
 
 When VCS is enabled and a task passes internal review:
 
