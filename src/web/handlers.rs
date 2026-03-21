@@ -13,6 +13,7 @@ use super::models::{
     NocTaskCounts, OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
 };
 use crate::config;
+use crate::lock::is_process_alive;
 use crate::td::Task;
 
 // --- Validation allowlists ---
@@ -359,15 +360,6 @@ fn check_lock_status(lock_dir: &str, slug: &str) -> LockStatus {
     } else {
         LockStatus::Stale
     }
-}
-
-fn is_process_alive(pid: u32) -> bool {
-    std::process::Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
 }
 
 fn fetch_orchestrator_status(
