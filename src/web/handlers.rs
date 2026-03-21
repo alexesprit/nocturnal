@@ -614,8 +614,7 @@ pub async fn project(
         None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
     };
 
-    let view = sanitize_param(&params.view, ALLOWED_VIEWS)
-        .unwrap_or_else(|| "table".to_string());
+    let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
 
     let td_binary = state.td_binary.clone();
     let path = entry.path.clone();
@@ -689,8 +688,7 @@ pub async fn project_issues(
 
     let is_htmx = headers.get("HX-Request").is_some();
 
-    let view = sanitize_param(&params.view, ALLOWED_VIEWS)
-        .unwrap_or_else(|| "table".to_string());
+    let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
 
     const MAX_QUERY_LEN: usize = 200;
     let query = if params.q.is_empty()
@@ -723,7 +721,13 @@ pub async fn project_issues(
             if is_htmx {
                 if view == "kanban" {
                     let (open, in_progress, blocked, in_review) = group_by_status(issues);
-                    let tmpl = KanbanBoardTemplate { name, open, in_progress, blocked, in_review };
+                    let tmpl = KanbanBoardTemplate {
+                        name,
+                        open,
+                        in_progress,
+                        blocked,
+                        in_review,
+                    };
                     into_html_response(tmpl)
                 } else {
                     let tmpl = TableWrapperTemplate { name, issues };

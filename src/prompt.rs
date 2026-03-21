@@ -64,7 +64,10 @@ pub fn render_with_vcs(
 ) -> String {
     render_base(template, task_id, project_root, max_reviews)
         .replace("{{VCS_REPLY_CMD}}", vcs_reply_cmd)
-        .replace("{{VCS_INLINE_REPLY_INSTRUCTIONS}}", vcs_inline_reply_instructions)
+        .replace(
+            "{{VCS_INLINE_REPLY_INSTRUCTIONS}}",
+            vcs_inline_reply_instructions,
+        )
         .replace("{{VCS_RESOLVE_RULE}}", vcs_resolve_rule)
 }
 
