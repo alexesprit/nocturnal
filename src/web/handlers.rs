@@ -42,10 +42,7 @@ fn sanitize_param(value: &str, allowed: &[&str]) -> Option<String> {
 }
 
 fn is_valid_issue_id(id: &str) -> bool {
-    !id.is_empty()
-        && id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    crate::td::validate_task_id(id).is_ok()
 }
 
 // --- Askama templates ---
