@@ -58,6 +58,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
                         info!("Remote branch deletion failed (best-effort)");
                     }
                 }
+                vcs::run_post_merge_hooks(&ctx.project_root, &ctx.post_merge_hooks);
                 continue;
             }
             vcs::ProposalState::Closed => {
@@ -178,7 +179,7 @@ pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
     };
     let desc = &task.description;
 
-    let proposal = vcs::create_proposal(platform, &wt_path, &title, desc)?;
+    let proposal = vcs::create_proposal(platform, &wt_path, &title, desc, &ctx.target_branch)?;
     info!("Proposal created: {platform} #{}", proposal.id);
 
     // Enable auto-merge (best-effort)

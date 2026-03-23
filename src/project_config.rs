@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub const DEFAULT_MAX_REVIEWS: u32 = 3;
 pub const DEFAULT_MAX_BUDGET: Option<u32> = None;
 pub const DEFAULT_MODEL: &str = "sonnet";
+pub const DEFAULT_TARGET_BRANCH: &str = "main";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -15,6 +16,18 @@ pub enum VcsMode {
     Auto,
     GitHub,
     GitLab,
+    Local,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+pub enum MergeStrategy {
+    #[default]
+    #[serde(rename = "ff")]
+    Ff,
+    #[serde(rename = "no-ff")]
+    NoFf,
+    #[serde(rename = "rebase")]
+    Rebase,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -22,6 +35,13 @@ struct VcsConfig {
     mode: Option<VcsMode>,
     auto_merge: Option<bool>,
     delete_branch_on_merge: Option<bool>,
+    target_branch: Option<String>,
+    merge_strategy: Option<MergeStrategy>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct HooksConfig {
+    post_merge: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -34,6 +54,7 @@ struct ClaudeConfig {
 #[derive(Debug, Deserialize)]
 struct ProjectConfig {
     vcs: Option<VcsConfig>,
+    hooks: Option<HooksConfig>,
     max_reviews: Option<u32>,
     max_budget: Option<u32>,
     claude: Option<ClaudeConfig>,
@@ -43,10 +64,13 @@ pub struct ProjectSettings {
     pub vcs_mode: VcsMode,
     pub auto_merge: bool,
     pub delete_branch_on_merge: bool,
+    pub target_branch: String,
+    pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
     pub implement_model: String,
     pub review_model: String,
+    pub post_merge_hooks: Vec<String>,
 }
 
 pub fn load_project_settings(project_root: &str) -> ProjectSettings {
@@ -64,10 +88,23 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
             let vcs = f.vcs.unwrap_or_default();
             let claude = f.claude.unwrap_or_default();
             let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
+            let hooks = f.hooks.unwrap_or_default();
             ProjectSettings {
                 vcs_mode: vcs.mode.unwrap_or_default(),
                 auto_merge: vcs.auto_merge.unwrap_or(true),
                 delete_branch_on_merge: vcs.delete_branch_on_merge.unwrap_or(false),
+                target_branch: vcs
+                    .target_branch
+                    .filter(|b| {
+                        if validate_branch_name(b) {
+                            true
+                        } else {
+                            tracing::warn!("Invalid target_branch {b:?}, using default");
+                            false
+                        }
+                    })
+                    .unwrap_or_else(|| DEFAULT_TARGET_BRANCH.to_string()),
+                merge_strategy: vcs.merge_strategy.unwrap_or_default(),
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
                 implement_model: claude
@@ -76,6 +113,7 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
                 review_model: claude
                     .review_model
                     .unwrap_or_else(|| default_model.to_string()),
+                post_merge_hooks: hooks.post_merge.unwrap_or_default(),
             }
         }
         Err(e) => {
@@ -91,12 +129,31 @@ impl Default for ProjectSettings {
             vcs_mode: VcsMode::default(),
             auto_merge: true,
             delete_branch_on_merge: false,
+            target_branch: DEFAULT_TARGET_BRANCH.to_string(),
+            merge_strategy: MergeStrategy::default(),
             max_reviews: DEFAULT_MAX_REVIEWS,
             max_budget: DEFAULT_MAX_BUDGET,
             implement_model: DEFAULT_MODEL.to_string(),
             review_model: DEFAULT_MODEL.to_string(),
+            post_merge_hooks: Vec::new(),
         }
     }
+}
+
+/// Validate that a branch name doesn't contain problematic characters.
+/// Rejects characters forbidden by git ref format rules.
+fn validate_branch_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains("..")
+        && !name.contains("@{")
+        && !name.starts_with('.')
+        && !name.ends_with('.')
+        && !name.ends_with(".lock")
+        && !name.contains(|c: char| {
+            c.is_whitespace()
+                || c.is_control()
+                || matches!(c, '~' | '^' | ':' | '?' | '*' | '[' | '\\')
+        })
 }
 
 /// Convenience wrapper kept for callers that only need vcs mode.
@@ -115,6 +172,7 @@ mod tests {
             ("auto", VcsMode::Auto),
             ("github", VcsMode::GitHub),
             ("gitlab", VcsMode::GitLab),
+            ("local", VcsMode::Local),
         ] {
             let f: ProjectConfig = toml::from_str(&format!("[vcs]\nmode = \"{input}\"")).unwrap();
             assert_eq!(f.vcs.unwrap().mode.unwrap(), expected);
@@ -220,6 +278,9 @@ mod tests {
         assert_eq!(settings.max_budget, DEFAULT_MAX_BUDGET);
         assert_eq!(settings.implement_model, DEFAULT_MODEL);
         assert_eq!(settings.review_model, DEFAULT_MODEL);
+        assert_eq!(settings.target_branch, DEFAULT_TARGET_BRANCH);
+        assert_eq!(settings.merge_strategy, MergeStrategy::Ff);
+        assert!(settings.post_merge_hooks.is_empty());
     }
 
     #[test]
@@ -279,5 +340,148 @@ mod tests {
         let settings = load_project_settings("/nonexistent/path");
         assert_eq!(settings.implement_model, DEFAULT_MODEL);
         assert_eq!(settings.review_model, DEFAULT_MODEL);
+    }
+
+    // --- MergeStrategy ---
+
+    #[test]
+    fn parse_merge_strategies() {
+        for (input, expected) in [
+            ("ff", MergeStrategy::Ff),
+            ("no-ff", MergeStrategy::NoFf),
+            ("rebase", MergeStrategy::Rebase),
+        ] {
+            let f: ProjectConfig =
+                toml::from_str(&format!("[vcs]\nmerge_strategy = \"{input}\"")).unwrap();
+            assert_eq!(f.vcs.unwrap().merge_strategy.unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn parse_unrecognized_merge_strategy_is_error() {
+        assert!(toml::from_str::<ProjectConfig>("[vcs]\nmerge_strategy = \"squash\"").is_err());
+    }
+
+    #[test]
+    fn merge_strategy_defaults_to_ff() {
+        let settings = load_project_settings("/nonexistent/path");
+        assert_eq!(settings.merge_strategy, MergeStrategy::Ff);
+    }
+
+    // --- target_branch ---
+
+    #[test]
+    fn parse_target_branch() {
+        let f: ProjectConfig =
+            toml::from_str("[vcs]\nmode = \"local\"\ntarget_branch = \"develop\"").unwrap();
+        assert_eq!(f.vcs.unwrap().target_branch.unwrap(), "develop");
+    }
+
+    #[test]
+    fn target_branch_defaults_to_main() {
+        let settings = load_project_settings("/nonexistent/path");
+        assert_eq!(settings.target_branch, "main");
+    }
+
+    // --- Local VCS mode ---
+
+    #[test]
+    fn parse_local_vcs_mode() {
+        let f: ProjectConfig = toml::from_str("[vcs]\nmode = \"local\"").unwrap();
+        assert_eq!(f.vcs.unwrap().mode.unwrap(), VcsMode::Local);
+    }
+
+    #[test]
+    fn parse_local_mode_with_merge_strategy() {
+        let f: ProjectConfig = toml::from_str(
+            "[vcs]\nmode = \"local\"\ntarget_branch = \"develop\"\nmerge_strategy = \"no-ff\"",
+        )
+        .unwrap();
+        let vcs = f.vcs.unwrap();
+        assert_eq!(vcs.mode.unwrap(), VcsMode::Local);
+        assert_eq!(vcs.target_branch.unwrap(), "develop");
+        assert_eq!(vcs.merge_strategy.unwrap(), MergeStrategy::NoFf);
+    }
+
+    // --- HooksConfig ---
+
+    #[test]
+    fn parse_hooks_config() {
+        let f: ProjectConfig =
+            toml::from_str("[hooks]\npost_merge = [\"git push\", \"just install\"]").unwrap();
+        let hooks = f.hooks.unwrap();
+        assert_eq!(hooks.post_merge.unwrap(), vec!["git push", "just install"]);
+    }
+
+    #[test]
+    fn parse_empty_hooks() {
+        let f: ProjectConfig = toml::from_str("[hooks]").unwrap();
+        let hooks = f.hooks.unwrap();
+        assert!(hooks.post_merge.is_none());
+    }
+
+    #[test]
+    fn parse_hooks_empty_list() {
+        let f: ProjectConfig = toml::from_str("[hooks]\npost_merge = []").unwrap();
+        let hooks = f.hooks.unwrap();
+        assert!(hooks.post_merge.unwrap().is_empty());
+    }
+
+    #[test]
+    fn post_merge_hooks_default_to_empty() {
+        let settings = load_project_settings("/nonexistent/path");
+        assert!(settings.post_merge_hooks.is_empty());
+    }
+
+    #[test]
+    fn validate_branch_name_rejects_invalid() {
+        assert!(!validate_branch_name(""));
+        assert!(!validate_branch_name("main..dev"));
+        assert!(!validate_branch_name("my branch"));
+        assert!(!validate_branch_name("main\t"));
+        assert!(!validate_branch_name("main\ndev"));
+        assert!(!validate_branch_name("main~1"));
+        assert!(!validate_branch_name("branch^2"));
+        assert!(!validate_branch_name("branch:name"));
+        assert!(!validate_branch_name("branch?"));
+        assert!(!validate_branch_name("branch*"));
+        assert!(!validate_branch_name("branch[0]"));
+        assert!(!validate_branch_name("branch\\foo"));
+        assert!(!validate_branch_name("@{upstream}"));
+        assert!(!validate_branch_name(".hidden"));
+        assert!(!validate_branch_name("trailing."));
+        assert!(!validate_branch_name("main.lock"));
+    }
+
+    #[test]
+    fn validate_branch_name_accepts_valid() {
+        assert!(validate_branch_name("main"));
+        assert!(validate_branch_name("develop"));
+        assert!(validate_branch_name("feature/foo"));
+        assert!(validate_branch_name("release-1.0"));
+        assert!(validate_branch_name("v2.0.0"));
+        assert!(validate_branch_name("user@feature"));
+    }
+
+    #[test]
+    fn parse_full_config_with_hooks_and_local() {
+        let toml_str = r#"
+max_reviews = 5
+
+[vcs]
+mode = "local"
+target_branch = "develop"
+merge_strategy = "rebase"
+
+[hooks]
+post_merge = ["git push"]
+"#;
+        let f: ProjectConfig = toml::from_str(toml_str).unwrap();
+        let vcs = f.vcs.unwrap();
+        assert_eq!(vcs.mode.unwrap(), VcsMode::Local);
+        assert_eq!(vcs.target_branch.unwrap(), "develop");
+        assert_eq!(vcs.merge_strategy.unwrap(), MergeStrategy::Rebase);
+        assert_eq!(f.hooks.unwrap().post_merge.unwrap(), vec!["git push"]);
+        assert_eq!(f.max_reviews.unwrap(), 5);
     }
 }

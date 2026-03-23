@@ -2,7 +2,8 @@ use anyhow::Result;
 use tracing::{error, info};
 
 use crate::config::ProjectContext;
-use crate::{claude, git, lock, prompt, td};
+use crate::project_config::VcsMode;
+use crate::{claude, git, lock, prompt, td, vcs};
 
 pub fn run(ctx: &ProjectContext) -> Result<()> {
     let slug = ctx.project_slug();
@@ -99,12 +100,44 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     if task.labels.iter().any(|l| l.starts_with("noc-proposal:")) {
         info!("Task {task_id} already has an open proposal — skipping re-review");
     } else if task.status == "in_review" {
-        // LLM approved — add label programmatically and create proposal
-        info!("Task {task_id} approved — adding noc-proposal-ready label");
-        let labels = td::swap_label(&task, "noc-proposal-ready", Some("noc-proposal-ready"));
-        td_client.update_labels(task_id, &labels)?;
-        info!("Task {task_id} passed internal review — creating proposal");
-        super::proposal_review::create_proposal(ctx, task_id)?;
+        // LLM approved the review
+        match ctx.vcs_mode {
+            VcsMode::Local => {
+                info!("Task {task_id} approved — performing local merge");
+                match vcs::local_merge(
+                    &ctx.project_root,
+                    task_id,
+                    &ctx.target_branch,
+                    ctx.merge_strategy,
+                    &wt_path,
+                ) {
+                    Ok(()) => {
+                        td_client.approve(task_id)?;
+                        info!("Task {task_id} merged and approved");
+                        vcs::run_post_merge_hooks(&ctx.project_root, &ctx.post_merge_hooks);
+                    }
+                    Err(e) => {
+                        error!("Local merge failed for {task_id}: {e:#}");
+                        td_client
+                            .comment(task_id, &format!("Orchestrator: local merge failed: {e:#}"))
+                            .ok();
+                        td_client.block(task_id).ok();
+                    }
+                }
+            }
+            VcsMode::Off => {
+                info!("Task {task_id} approved (VCS off) — approving task");
+                td_client.approve(task_id)?;
+            }
+            VcsMode::Auto | VcsMode::GitHub | VcsMode::GitLab => {
+                info!("Task {task_id} approved — adding noc-proposal-ready label");
+                let labels =
+                    td::swap_label(&task, "noc-proposal-ready", Some("noc-proposal-ready"));
+                td_client.update_labels(task_id, &labels)?;
+                info!("Task {task_id} passed internal review — creating proposal");
+                super::proposal_review::create_proposal(ctx, task_id)?;
+            }
+        }
     } else if task.status == "open" {
         let new_count = td::get_review_count(&task) + 1;
         let labels = td::build_labels_with_review_count(&task, new_count);

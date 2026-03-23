@@ -2,7 +2,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
-use crate::project_config::VcsMode;
+use crate::project_config::{MergeStrategy, VcsMode};
 use crate::util::retry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,7 +22,7 @@ impl std::fmt::Display for Platform {
 
 pub fn detect_platform(project_root: &str, vcs_mode: VcsMode) -> Option<Platform> {
     match vcs_mode {
-        VcsMode::Off => return None,
+        VcsMode::Off | VcsMode::Local => return None,
         VcsMode::GitHub => return Some(Platform::GitHub),
         VcsMode::GitLab => return Some(Platform::GitLab),
         VcsMode::Auto => {}
@@ -48,6 +48,7 @@ pub fn create_proposal(
     wt_path: &str,
     title: &str,
     description: &str,
+    target_branch: &str,
 ) -> Result<Proposal> {
     retry("VCS", || match platform {
         Platform::GitLab => {
@@ -60,7 +61,7 @@ pub fn create_proposal(
                     "--description",
                     description,
                     "--target-branch",
-                    "main",
+                    target_branch,
                     "--label",
                     "nocturnal",
                     "--yes",
@@ -100,7 +101,7 @@ pub fn create_proposal(
                     "--body",
                     description,
                     "--base",
-                    "main",
+                    target_branch,
                     "--label",
                     "nocturnal",
                 ])
@@ -355,6 +356,60 @@ pub fn fetch_unresolved_comments(
     })
 }
 
+/// Perform a local merge of the task's worktree branch into the target branch.
+pub fn local_merge(
+    project_root: &str,
+    task_id: &str,
+    target_branch: &str,
+    strategy: MergeStrategy,
+    wt_path: &str,
+) -> Result<()> {
+    let source_branch = crate::git::worktree_branch(task_id);
+
+    // Check if already merged
+    if crate::git::is_ancestor(project_root, &source_branch, target_branch)? {
+        tracing::info!(
+            "Branch {source_branch} is already merged into {target_branch} — nothing to do"
+        );
+        return Ok(());
+    }
+
+    match strategy {
+        MergeStrategy::Ff => crate::git::merge_ff_only(project_root, target_branch, &source_branch),
+        MergeStrategy::NoFf => crate::git::merge_no_ff(project_root, target_branch, &source_branch),
+        MergeStrategy::Rebase => {
+            crate::git::rebase_and_merge(project_root, target_branch, &source_branch, wt_path)
+        }
+    }
+}
+
+/// Run post-merge hook commands. Logs failures but does not abort on error.
+pub fn run_post_merge_hooks(project_root: &str, hooks: &[String]) {
+    for cmd in hooks {
+        tracing::info!("Running post-merge hook: {cmd}");
+        let output = Command::new("sh")
+            .args(["-c", cmd])
+            .current_dir(project_root)
+            .output();
+        match output {
+            Ok(o) if o.status.success() => {
+                tracing::info!("Post-merge hook succeeded: {cmd}");
+            }
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                tracing::warn!(
+                    "Post-merge hook failed (exit {}): {cmd}\n{}",
+                    o.status,
+                    stderr.trim()
+                );
+            }
+            Err(e) => {
+                tracing::warn!("Post-merge hook error: {cmd}: {e}");
+            }
+        }
+    }
+}
+
 fn gh_owner_repo(wt_path: &str) -> Result<(String, String)> {
     let output = Command::new("gh")
         .args(["repo", "view", "--json", "owner,name"])
@@ -434,6 +489,11 @@ mod tests {
     #[test]
     fn detect_platform_off() {
         assert!(detect_platform("/unused", VcsMode::Off).is_none());
+    }
+
+    #[test]
+    fn detect_platform_local() {
+        assert!(detect_platform("/unused", VcsMode::Local).is_none());
     }
 
     #[test]

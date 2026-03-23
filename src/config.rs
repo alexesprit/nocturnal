@@ -2,9 +2,9 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 
-use crate::project_config::{self, VcsMode};
+use crate::project_config::{self, MergeStrategy, VcsMode};
 
 #[derive(Clone)]
 pub struct Config {
@@ -21,10 +21,13 @@ pub struct ProjectContext {
     pub vcs_mode: VcsMode,
     pub auto_merge: bool,
     pub delete_branch_on_merge: bool,
+    pub target_branch: String,
+    pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
     pub implement_model: String,
     pub review_model: String,
+    pub post_merge_hooks: Vec<String>,
 }
 
 impl ProjectContext {
@@ -36,10 +39,13 @@ impl ProjectContext {
             vcs_mode: settings.vcs_mode,
             auto_merge: settings.auto_merge,
             delete_branch_on_merge: settings.delete_branch_on_merge,
+            target_branch: settings.target_branch,
+            merge_strategy: settings.merge_strategy,
             max_reviews: settings.max_reviews,
             max_budget: settings.max_budget,
             implement_model: settings.implement_model,
             review_model: settings.review_model,
+            post_merge_hooks: settings.post_merge_hooks,
         }
     }
 
