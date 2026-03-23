@@ -104,6 +104,22 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         match ctx.vcs_mode {
             VcsMode::Local => {
                 info!("Task {task_id} approved — performing local merge");
+
+                if !ctx.pre_merge_hooks.is_empty() {
+                    info!("Running pre-merge hooks in worktree");
+                    if let Err(e) = vcs::run_pre_merge_hooks(&wt_path, &ctx.pre_merge_hooks) {
+                        error!("Pre-merge hook failed for {task_id}: {e:#}");
+                        td_client
+                            .comment(
+                                task_id,
+                                &format!("Orchestrator: pre-merge hook failed: {e:#}"),
+                            )
+                            .ok();
+                        td_client.block(task_id).ok();
+                        return Ok(true);
+                    }
+                }
+
                 match vcs::local_merge(
                     &ctx.project_root,
                     task_id,

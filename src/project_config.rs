@@ -41,6 +41,7 @@ struct VcsConfig {
 
 #[derive(Debug, Default, Deserialize)]
 struct HooksConfig {
+    pre_merge: Option<Vec<String>>,
     post_merge: Option<Vec<String>>,
 }
 
@@ -70,6 +71,7 @@ pub struct ProjectSettings {
     pub max_budget: Option<u32>,
     pub implement_model: String,
     pub review_model: String,
+    pub pre_merge_hooks: Vec<String>,
     pub post_merge_hooks: Vec<String>,
 }
 
@@ -113,6 +115,7 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
                 review_model: claude
                     .review_model
                     .unwrap_or_else(|| default_model.to_string()),
+                pre_merge_hooks: hooks.pre_merge.unwrap_or_default(),
                 post_merge_hooks: hooks.post_merge.unwrap_or_default(),
             }
         }
@@ -135,6 +138,7 @@ impl Default for ProjectSettings {
             max_budget: DEFAULT_MAX_BUDGET,
             implement_model: DEFAULT_MODEL.to_string(),
             review_model: DEFAULT_MODEL.to_string(),
+            pre_merge_hooks: Vec::new(),
             post_merge_hooks: Vec::new(),
         }
     }
@@ -434,6 +438,44 @@ mod tests {
     }
 
     #[test]
+    fn parse_pre_merge_hooks() {
+        let f: ProjectConfig =
+            toml::from_str("[hooks]\npre_merge = [\"cargo test\", \"cargo clippy\"]").unwrap();
+        let hooks = f.hooks.unwrap();
+        assert_eq!(hooks.pre_merge.unwrap(), vec!["cargo test", "cargo clippy"]);
+    }
+
+    #[test]
+    fn parse_empty_pre_merge() {
+        let f: ProjectConfig = toml::from_str("[hooks]").unwrap();
+        let hooks = f.hooks.unwrap();
+        assert!(hooks.pre_merge.is_none());
+    }
+
+    #[test]
+    fn parse_pre_merge_empty_list() {
+        let f: ProjectConfig = toml::from_str("[hooks]\npre_merge = []").unwrap();
+        let hooks = f.hooks.unwrap();
+        assert!(hooks.pre_merge.unwrap().is_empty());
+    }
+
+    #[test]
+    fn pre_merge_hooks_default_to_empty() {
+        let settings = load_project_settings("/nonexistent/path");
+        assert!(settings.pre_merge_hooks.is_empty());
+    }
+
+    #[test]
+    fn parse_both_hooks() {
+        let f: ProjectConfig =
+            toml::from_str("[hooks]\npre_merge = [\"cargo test\"]\npost_merge = [\"git push\"]")
+                .unwrap();
+        let hooks = f.hooks.unwrap();
+        assert_eq!(hooks.pre_merge.unwrap(), vec!["cargo test"]);
+        assert_eq!(hooks.post_merge.unwrap(), vec!["git push"]);
+    }
+
+    #[test]
     fn validate_branch_name_rejects_invalid() {
         assert!(!validate_branch_name(""));
         assert!(!validate_branch_name("main..dev"));
@@ -474,6 +516,7 @@ target_branch = "develop"
 merge_strategy = "rebase"
 
 [hooks]
+pre_merge = ["cargo test"]
 post_merge = ["git push"]
 "#;
         let f: ProjectConfig = toml::from_str(toml_str).unwrap();
@@ -481,7 +524,9 @@ post_merge = ["git push"]
         assert_eq!(vcs.mode.unwrap(), VcsMode::Local);
         assert_eq!(vcs.target_branch.unwrap(), "develop");
         assert_eq!(vcs.merge_strategy.unwrap(), MergeStrategy::Rebase);
-        assert_eq!(f.hooks.unwrap().post_merge.unwrap(), vec!["git push"]);
+        let hooks = f.hooks.unwrap();
+        assert_eq!(hooks.pre_merge.unwrap(), vec!["cargo test"]);
+        assert_eq!(hooks.post_merge.unwrap(), vec!["git push"]);
         assert_eq!(f.max_reviews.unwrap(), 5);
     }
 }

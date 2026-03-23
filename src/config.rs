@@ -27,6 +27,7 @@ pub struct ProjectContext {
     pub max_budget: Option<u32>,
     pub implement_model: String,
     pub review_model: String,
+    pub pre_merge_hooks: Vec<String>,
     pub post_merge_hooks: Vec<String>,
 }
 
@@ -45,6 +46,7 @@ impl ProjectContext {
             max_budget: settings.max_budget,
             implement_model: settings.implement_model,
             review_model: settings.review_model,
+            pre_merge_hooks: settings.pre_merge_hooks,
             post_merge_hooks: settings.post_merge_hooks,
         }
     }

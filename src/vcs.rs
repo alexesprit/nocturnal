@@ -410,6 +410,37 @@ pub fn run_post_merge_hooks(project_root: &str, hooks: &[String]) {
     }
 }
 
+/// Run pre-merge hook commands in the worktree. Returns Err on first failure.
+pub fn run_pre_merge_hooks(wt_path: &str, hooks: &[String]) -> Result<()> {
+    for cmd in hooks {
+        tracing::info!("Running pre-merge hook: {cmd}");
+        let output = Command::new("sh")
+            .args(["-c", cmd])
+            .current_dir(wt_path)
+            .output()
+            .with_context(|| format!("Failed to execute pre-merge hook: {cmd}"))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut detail = stderr.trim().to_string();
+            if !stdout.trim().is_empty() {
+                if !detail.is_empty() {
+                    detail.push('\n');
+                }
+                detail.push_str(stdout.trim());
+            }
+            bail!(
+                "Pre-merge hook failed (exit {}): {cmd}\n{}",
+                output.status,
+                detail
+            );
+        }
+        tracing::info!("Pre-merge hook succeeded: {cmd}");
+    }
+    Ok(())
+}
+
 fn gh_owner_repo(wt_path: &str) -> Result<(String, String)> {
     let output = Command::new("gh")
         .args(["repo", "view", "--json", "owner,name"])
@@ -518,5 +549,29 @@ mod tests {
     fn platform_display() {
         assert_eq!(Platform::GitHub.to_string(), "github");
         assert_eq!(Platform::GitLab.to_string(), "gitlab");
+    }
+
+    // --- run_pre_merge_hooks ---
+
+    #[test]
+    fn pre_merge_hooks_empty_succeeds() {
+        assert!(run_pre_merge_hooks("/tmp", &[]).is_ok());
+    }
+
+    #[test]
+    fn pre_merge_hooks_success() {
+        assert!(run_pre_merge_hooks("/tmp", &["true".to_string()]).is_ok());
+    }
+
+    #[test]
+    fn pre_merge_hooks_failure() {
+        assert!(run_pre_merge_hooks("/tmp", &["false".to_string()]).is_err());
+    }
+
+    #[test]
+    fn pre_merge_hooks_stops_on_first_failure() {
+        let hooks = vec!["true".to_string(), "false".to_string(), "true".to_string()];
+        let err = run_pre_merge_hooks("/tmp", &hooks).unwrap_err();
+        assert!(err.to_string().contains("Pre-merge hook failed"));
     }
 }
