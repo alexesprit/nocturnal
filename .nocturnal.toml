@@ -1,4 +1,8 @@
 [vcs]
-mode = "auto"
-auto_merge = false
-delete_branch_on_merge = true
+mode = "local"
+target_branch = "main"
+merge_strategy = "ff"
+
+[hooks]
+pre_merge = ["just ci"]
+post_merge = ["just install"]
