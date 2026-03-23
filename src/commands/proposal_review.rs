@@ -80,8 +80,8 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
 
         // Proposal is open — check for unresolved comments
         let comments_json = vcs::fetch_unresolved_comments(platform, &wt_path, &proposal_id)?;
-        let comments: Vec<serde_json::Value> =
-            serde_json::from_str(&comments_json).context("failed to parse unresolved comments JSON")?;
+        let comments: Vec<serde_json::Value> = serde_json::from_str(&comments_json)
+            .context("failed to parse unresolved comments JSON")?;
 
         if comments.is_empty() {
             info!("No unresolved comments on proposal #{proposal_id}");

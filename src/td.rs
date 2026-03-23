@@ -316,10 +316,9 @@ impl<'a> Td<'a> {
 
     pub fn list_by_status(&self, status: &str) -> Result<Vec<Task>> {
         let json = self.run(&["list", "--json", "--status", status])?;
-        let tasks: Vec<Task> =
-            serde_json::from_str::<Option<Vec<Task>>>(&json)
-                .context("failed to parse td list output")?
-                .unwrap_or_default();
+        let tasks: Vec<Task> = serde_json::from_str::<Option<Vec<Task>>>(&json)
+            .context("failed to parse td list output")?
+            .unwrap_or_default();
         Ok(tasks
             .into_iter()
             .filter(|t| validate_task_id(&t.id).is_ok())
@@ -399,7 +398,11 @@ impl<'a> Td<'a> {
             let stderr = String::from_utf8_lossy(&output.stderr);
             bail!("td start {} failed: {}", task_id, stderr.trim());
         }
-        debug!("td start {}: {}", task_id, String::from_utf8_lossy(&output.stdout).trim());
+        debug!(
+            "td start {}: {}",
+            task_id,
+            String::from_utf8_lossy(&output.stdout).trim()
+        );
         Ok(())
     }
 
@@ -413,7 +416,11 @@ impl<'a> Td<'a> {
             let stderr = String::from_utf8_lossy(&output.stderr);
             bail!("td review {} failed: {}", task_id, stderr.trim());
         }
-        debug!("td review {}: {}", task_id, String::from_utf8_lossy(&output.stdout).trim());
+        debug!(
+            "td review {}: {}",
+            task_id,
+            String::from_utf8_lossy(&output.stdout).trim()
+        );
         Ok(())
     }
 

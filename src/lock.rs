@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{Result, bail};
-use tracing::info;
+use tracing::{info, warn};
 
 pub struct Lock {
     path: PathBuf,
@@ -30,7 +30,9 @@ impl Lock {
         }
 
         let pidfile = path.join("pid");
-        fs::write(&pidfile, std::process::id().to_string()).ok();
+        if let Err(e) = fs::write(&pidfile, std::process::id().to_string()) {
+            warn!("failed to write PID file: {e}");
+        }
 
         Ok(Lock { path })
     }
