@@ -197,8 +197,16 @@ review_model = "haiku"
 # "auto"   — detect GitLab/GitHub from origin remote URL
 # "github" — force GitHub
 # "gitlab" — force GitLab
+# "local"  — merge directly into the local target branch after approval
 # "off"    — no proposals (default if section is missing)
 mode = "auto"
+
+# Target branch for proposals or local merges (default: "main")
+target_branch = "main"
+
+# Local merge strategy: "ff", "no-ff", or "rebase"
+# Defaults to "rebase" in local mode and "ff" otherwise.
+merge_strategy = "rebase"
 
 # Enable auto-merge on created proposals (default: true)
 # Set to false if your repo has no branch protection rules,

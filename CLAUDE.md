@@ -75,9 +75,11 @@ Each project can have a `.nocturnal.toml` in its root. Top-level fields:
 - `review_model` — override model for review/proposal-review (falls back to `model`)
 
 `[vcs]` section:
-- `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, or `"off"` (default). Controls whether nocturnal creates MRs/PRs after internal review passes.
+- `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, `"local"`, or `"off"` (default). `"local"` merges directly into the configured target branch after internal review passes.
 - `auto_merge` — boolean (default `true`). When `false`, nocturnal creates the PR/MR but does not enable auto-merge.
 - `delete_branch_on_merge` — boolean (default `false`). When `true`, deletes the remote branch after a proposal is merged.
+- `target_branch` — branch to merge into or open proposals against (default `"main"`).
+- `merge_strategy` — local merge strategy: `"ff"`, `"no-ff"`, or `"rebase"`. Defaults to `"rebase"` for `mode = "local"`, otherwise `"ff"`.
 
 ## Prompt Extras
 

@@ -75,6 +75,14 @@ pub struct ProjectSettings {
     pub post_merge_hooks: Vec<String>,
 }
 
+fn resolve_merge_strategy(vcs: &VcsConfig) -> MergeStrategy {
+    vcs.merge_strategy
+        .unwrap_or_else(|| match vcs.mode.unwrap_or_default() {
+            VcsMode::Local => MergeStrategy::Rebase,
+            _ => MergeStrategy::Ff,
+        })
+}
+
 pub fn load_project_settings(project_root: &str) -> ProjectSettings {
     let path = Path::new(project_root).join(".nocturnal.toml");
     let content = match std::fs::read_to_string(&path) {
@@ -91,6 +99,7 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
             let claude = f.claude.unwrap_or_default();
             let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
             let hooks = f.hooks.unwrap_or_default();
+            let merge_strategy = resolve_merge_strategy(&vcs);
             ProjectSettings {
                 vcs_mode: vcs.mode.unwrap_or_default(),
                 auto_merge: vcs.auto_merge.unwrap_or(true),
@@ -106,7 +115,7 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
                         }
                     })
                     .unwrap_or_else(|| DEFAULT_TARGET_BRANCH.to_string()),
-                merge_strategy: vcs.merge_strategy.unwrap_or_default(),
+                merge_strategy,
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
                 implement_model: claude
@@ -370,6 +379,13 @@ mod tests {
     fn merge_strategy_defaults_to_ff() {
         let settings = load_project_settings("/nonexistent/path");
         assert_eq!(settings.merge_strategy, MergeStrategy::Ff);
+    }
+
+    #[test]
+    fn local_mode_defaults_to_rebase() {
+        let f: ProjectConfig = toml::from_str("[vcs]\nmode = \"local\"").unwrap();
+        let vcs = f.vcs.unwrap();
+        assert_eq!(resolve_merge_strategy(&vcs), MergeStrategy::Rebase);
     }
 
     // --- target_branch ---

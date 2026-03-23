@@ -1,7 +1,7 @@
 [vcs]
 mode = "local"
 target_branch = "main"
-merge_strategy = "ff"
+merge_strategy = "rebase"
 
 [hooks]
 pre_merge = ["just ci"]
