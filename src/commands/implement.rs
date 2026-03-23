@@ -48,6 +48,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     let wt_path = git::ensure_worktree(&ctx.project_root, task_id)?;
     info!("Worktree: {wt_path}");
 
+    // best-effort: task may already be in_progress from a previous attempt
     td.start(task_id).ok();
 
     let rendered = prompt::render_base(
@@ -70,6 +71,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         task_id,
     )? {
         info!("Implementation completed");
+        // best-effort: orchestrator will pick up the task for review on next cycle if this fails
         td.review(task_id).ok();
         info!("Task {task_id} submitted for review");
         Ok(true)

@@ -316,7 +316,10 @@ impl<'a> Td<'a> {
 
     pub fn list_by_status(&self, status: &str) -> Result<Vec<Task>> {
         let json = self.run(&["list", "--json", "--status", status])?;
-        let tasks: Vec<Task> = serde_json::from_str(&json).unwrap_or_default();
+        let tasks: Vec<Task> =
+            serde_json::from_str::<Option<Vec<Task>>>(&json)
+                .context("failed to parse td list output")?
+                .unwrap_or_default();
         Ok(tasks
             .into_iter()
             .filter(|t| validate_task_id(&t.id).is_ok())
@@ -324,17 +327,28 @@ impl<'a> Td<'a> {
     }
 
     pub fn get_next_task_id(&self) -> Result<Option<String>> {
-        let output = self.run(&["next"]);
-        match output {
-            Ok(stdout) => {
-                let id = stdout.split_whitespace().next().map(|s| s.to_string());
-                if let Some(ref task_id) = id {
-                    validate_task_id(task_id)?;
-                }
-                Ok(id)
+        let output = self
+            .cmd()
+            .args(["next"])
+            .output()
+            .context("Failed to run td next (is td installed?)")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr_trimmed = stderr.trim();
+            // td next exits non-zero with empty stderr when there are no open tasks
+            if stderr_trimmed.is_empty() {
+                return Ok(None);
             }
-            Err(_) => Ok(None),
+            bail!("td next failed: {}", stderr_trimmed);
         }
+
+        let stdout = String::from_utf8(output.stdout).context("td output was not valid UTF-8")?;
+        let id = stdout.split_whitespace().next().map(|s| s.to_string());
+        if let Some(ref task_id) = id {
+            validate_task_id(task_id)?;
+        }
+        Ok(id)
     }
 
     pub fn get_reviewable_task_id(&self) -> Result<Option<String>> {
@@ -381,13 +395,11 @@ impl<'a> Td<'a> {
             .args(["start", task_id])
             .output()
             .context("Failed to run td start")?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
         if !output.status.success() {
-            debug!("td start {} failed (ignored): {}", task_id, stderr.trim());
-        } else {
-            debug!("td start {}: {}", task_id, stdout.trim());
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            bail!("td start {} failed: {}", task_id, stderr.trim());
         }
+        debug!("td start {}: {}", task_id, String::from_utf8_lossy(&output.stdout).trim());
         Ok(())
     }
 
@@ -397,13 +409,11 @@ impl<'a> Td<'a> {
             .args(["review", task_id])
             .output()
             .context("Failed to run td review")?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
         if !output.status.success() {
-            debug!("td review {} failed (ignored): {}", task_id, stderr.trim());
-        } else {
-            debug!("td review {}: {}", task_id, stdout.trim());
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            bail!("td review {} failed: {}", task_id, stderr.trim());
         }
+        debug!("td review {}: {}", task_id, String::from_utf8_lossy(&output.stdout).trim());
         Ok(())
     }
 
