@@ -27,16 +27,16 @@ fi
 
 ### 1. Examine Changes
 
-View the diff against the main branch:
+View the diff against the base branch:
 ```bash
-git log --oneline $(git merge-base main HEAD)..HEAD
-git diff $(git merge-base main HEAD)..HEAD
+git log --oneline $(git merge-base {{BASE_BRANCH}} HEAD)..HEAD
+git diff $(git merge-base {{BASE_BRANCH}} HEAD)..HEAD
 ```
 
 If the diff is large, review file by file:
 ```bash
-git diff $(git merge-base main HEAD)..HEAD --stat
-git diff $(git merge-base main HEAD)..HEAD -- <file>
+git diff $(git merge-base {{BASE_BRANCH}} HEAD)..HEAD --stat
+git diff $(git merge-base {{BASE_BRANCH}} HEAD)..HEAD -- <file>
 ```
 
 ### 2. Review Criteria

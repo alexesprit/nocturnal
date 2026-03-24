@@ -31,7 +31,7 @@ Read the task title, description, acceptance criteria, and any previous handoff 
 
 Check if there are existing commits from a previous implementation attempt:
 ```bash
-git log --oneline $(git merge-base main HEAD)..HEAD
+git log --oneline $(git merge-base {{BASE_BRANCH}} HEAD)..HEAD
 ```
 
 If there are prior commits, review them to understand what was already done. Build on the existing work — focus specifically on addressing the rejection reason rather than starting from scratch.
@@ -61,7 +61,7 @@ td log --blocker "Pre-existing failure: <description>" -w "{{PROJECT_ROOT}}"
 
 Check recent commits to understand the project's commit message style:
 ```bash
-git log --oneline -10 main
+git log --oneline -10 {{BASE_BRANCH}}
 ```
 
 Create a commit that matches the existing style:

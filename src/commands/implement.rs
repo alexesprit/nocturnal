@@ -45,7 +45,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         return Ok(false);
     }
 
-    let wt_path = git::ensure_worktree(&ctx.project_root, task_id)?;
+    let wt_path = git::ensure_worktree(&ctx.project_root, task_id, &ctx.base_branch)?;
     info!("Worktree: {wt_path}");
 
     // best-effort: task may already be in_progress from a previous attempt
@@ -56,6 +56,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         task_id,
         &ctx.project_root,
         ctx.max_reviews,
+        &ctx.base_branch,
     );
 
     let slug = ctx.project_slug();

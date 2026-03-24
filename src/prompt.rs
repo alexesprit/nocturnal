@@ -45,8 +45,9 @@ pub fn render_with_review_cycle(
     project_root: &str,
     max_reviews: u32,
     review_cycle: Option<u32>,
+    base_branch: &str,
 ) -> String {
-    let mut result = render_base(template, task_id, project_root, max_reviews);
+    let mut result = render_base(template, task_id, project_root, max_reviews, base_branch);
     if let Some(cycle) = review_cycle {
         result = result.replace("{{REVIEW_CYCLE}}", &cycle.to_string());
     }
@@ -61,8 +62,9 @@ pub fn render_with_vcs(
     vcs_reply_cmd: &str,
     vcs_inline_reply_instructions: &str,
     vcs_resolve_rule: &str,
+    base_branch: &str,
 ) -> String {
-    render_base(template, task_id, project_root, max_reviews)
+    render_base(template, task_id, project_root, max_reviews, base_branch)
         .replace("{{VCS_REPLY_CMD}}", vcs_reply_cmd)
         .replace(
             "{{VCS_INLINE_REPLY_INSTRUCTIONS}}",
@@ -76,12 +78,14 @@ pub fn render_base(
     task_id: &str,
     project_root: &str,
     max_reviews: u32,
+    base_branch: &str,
 ) -> String {
     let mut result = template
         .content()
         .replace("{{TASK_ID}}", task_id)
         .replace("{{PROJECT_ROOT}}", project_root)
-        .replace("{{MAX_REVIEWS}}", &max_reviews.to_string());
+        .replace("{{MAX_REVIEWS}}", &max_reviews.to_string())
+        .replace("{{BASE_BRANCH}}", base_branch);
     append_extra(&mut result, project_root, &template);
     result
 }
@@ -100,10 +104,11 @@ mod tests {
 
     #[test]
     fn render_base_replaces_all_base_placeholders() {
-        let result = render_base(Template::Implement, "task-42", "/home/project", 5);
+        let result = render_base(Template::Implement, "task-42", "/home/project", 5, "main");
         assert!(!result.contains("{{TASK_ID}}"));
         assert!(!result.contains("{{PROJECT_ROOT}}"));
         assert!(!result.contains("{{MAX_REVIEWS}}"));
+        assert!(!result.contains("{{BASE_BRANCH}}"));
         assert!(result.contains("task-42"));
         assert!(result.contains("/home/project"));
         assert!(result.contains("5"));
@@ -111,14 +116,15 @@ mod tests {
 
     #[test]
     fn render_with_review_cycle_replaces_cycle_placeholder() {
-        let result = render_with_review_cycle(Template::Review, "task-1", "/root", 3, Some(2));
+        let result =
+            render_with_review_cycle(Template::Review, "task-1", "/root", 3, Some(2), "main");
         assert!(!result.contains("{{REVIEW_CYCLE}}"));
         assert!(result.contains("2"));
     }
 
     #[test]
     fn render_with_review_cycle_none_leaves_placeholder() {
-        let result = render_with_review_cycle(Template::Review, "task-1", "/root", 3, None);
+        let result = render_with_review_cycle(Template::Review, "task-1", "/root", 3, None, "main");
         assert!(result.contains("{{REVIEW_CYCLE}}"));
     }
 
@@ -132,6 +138,7 @@ mod tests {
             "glab mr note 42",
             "",
             "",
+            "main",
         );
         assert!(!result.contains("{{VCS_REPLY_CMD}}"));
         assert!(!result.contains("{{VCS_INLINE_REPLY_INSTRUCTIONS}}"));
@@ -199,7 +206,13 @@ mod tests {
         let tmp = tempdir();
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-extra.md"), "SHARED_EXTRA").unwrap();
-        let result = render_base(Template::Implement, "task-1", tmp.to_str().unwrap(), 3);
+        let result = render_base(
+            Template::Implement,
+            "task-1",
+            tmp.to_str().unwrap(),
+            3,
+            "main",
+        );
         assert!(result.contains("SHARED_EXTRA"));
     }
 
@@ -222,7 +235,7 @@ mod tests {
             (Template::Review, "review"),
             (Template::ProposalReview, "proposal-review"),
         ] {
-            let result = render_base(template, "id", "/proj", 3);
+            let result = render_base(template, "id", "/proj", 3, "main");
             assert!(
                 !result.contains("{{TASK_ID}}"),
                 "{name} still contains {{{{TASK_ID}}}}"
@@ -234,6 +247,10 @@ mod tests {
             assert!(
                 !result.contains("{{MAX_REVIEWS}}"),
                 "{name} still contains {{{{MAX_REVIEWS}}}}"
+            );
+            assert!(
+                !result.contains("{{BASE_BRANCH}}"),
+                "{name} still contains {{{{BASE_BRANCH}}}}"
             );
         }
     }

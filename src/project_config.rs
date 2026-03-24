@@ -35,6 +35,7 @@ struct VcsConfig {
     mode: Option<VcsMode>,
     auto_merge: Option<bool>,
     delete_branch_on_merge: Option<bool>,
+    base_branch: Option<String>,
     target_branch: Option<String>,
     merge_strategy: Option<MergeStrategy>,
 }
@@ -65,6 +66,7 @@ pub struct ProjectSettings {
     pub vcs_mode: VcsMode,
     pub auto_merge: bool,
     pub delete_branch_on_merge: bool,
+    pub base_branch: String,
     pub target_branch: String,
     pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
@@ -100,10 +102,22 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
             let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
             let hooks = f.hooks.unwrap_or_default();
             let merge_strategy = resolve_merge_strategy(&vcs);
+            let base_branch = vcs
+                .base_branch
+                .filter(|b| {
+                    if validate_branch_name(b) {
+                        true
+                    } else {
+                        tracing::warn!("Invalid base_branch {b:?}, using default");
+                        false
+                    }
+                })
+                .unwrap_or_else(|| DEFAULT_TARGET_BRANCH.to_string());
             ProjectSettings {
                 vcs_mode: vcs.mode.unwrap_or_default(),
                 auto_merge: vcs.auto_merge.unwrap_or(true),
                 delete_branch_on_merge: vcs.delete_branch_on_merge.unwrap_or(false),
+                base_branch: base_branch.clone(),
                 target_branch: vcs
                     .target_branch
                     .filter(|b| {
@@ -114,7 +128,7 @@ pub fn load_project_settings(project_root: &str) -> ProjectSettings {
                             false
                         }
                     })
-                    .unwrap_or_else(|| DEFAULT_TARGET_BRANCH.to_string()),
+                    .unwrap_or(base_branch),
                 merge_strategy,
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
@@ -141,6 +155,7 @@ impl Default for ProjectSettings {
             vcs_mode: VcsMode::default(),
             auto_merge: true,
             delete_branch_on_merge: false,
+            base_branch: DEFAULT_TARGET_BRANCH.to_string(),
             target_branch: DEFAULT_TARGET_BRANCH.to_string(),
             merge_strategy: MergeStrategy::default(),
             max_reviews: DEFAULT_MAX_REVIEWS,

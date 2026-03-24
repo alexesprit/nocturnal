@@ -58,33 +58,41 @@ pub fn worktree_path(project_root: &str, task_id: &str) -> Result<Option<String>
         .map(|(path, _)| path))
 }
 
-fn fetch_main(project_root: &str) {
+fn fetch_branch(project_root: &str, branch: &str) {
     let status = Command::new("git")
-        .args(["fetch", "origin", "main"])
+        .args(["fetch", "origin", branch])
         .current_dir(project_root)
         .status();
 
     match status {
         Ok(s) if s.success() => {}
         Ok(s) => {
-            tracing::warn!("git fetch origin main exited with {s}; continuing with local state")
+            tracing::warn!("git fetch origin {branch} exited with {s}; continuing with local state")
         }
-        Err(e) => tracing::warn!("git fetch origin main failed: {e}; continuing with local state"),
+        Err(e) => {
+            tracing::warn!("git fetch origin {branch} failed: {e}; continuing with local state")
+        }
     }
 }
 
-pub fn ensure_worktree(project_root: &str, task_id: &str) -> Result<String> {
+pub fn ensure_worktree(project_root: &str, task_id: &str, base_branch: &str) -> Result<String> {
     if let Some(path) = worktree_path(project_root, task_id)? {
         return Ok(path);
     }
 
-    fetch_main(project_root);
+    fetch_branch(project_root, base_branch);
 
     let branch = worktree_branch(task_id);
     tracing::info!("Creating worktree: {branch}");
 
     let status = Command::new("git")
-        .args(["gtr", "new", &branch])
+        .args([
+            "gtr",
+            "new",
+            &branch,
+            "--from",
+            &format!("origin/{base_branch}"),
+        ])
         .current_dir(project_root)
         .status()
         .context("Failed to run git gtr new")?;

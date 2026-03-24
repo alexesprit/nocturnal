@@ -124,6 +124,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             &vcs_reply_cmd,
             vcs_inline_reply_instructions,
             vcs_resolve_rule,
+            &ctx.base_branch,
         );
         rendered.push_str(&format!(
             "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"

@@ -73,6 +73,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         &ctx.project_root,
         ctx.max_reviews,
         Some(review_cycle),
+        &ctx.base_branch,
     );
 
     let slug = ctx.project_slug();
