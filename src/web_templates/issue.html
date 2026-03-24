@@ -55,7 +55,7 @@
         {% endif %}
         {% if let Some(wt_path) = noc.worktree_path %}
         <dt>Worktree Path</dt>
-        <dd><code>{{ wt_path }}</code></dd>
+        <dd><a href="vscode://file/{{ wt_path }}"><code>{{ wt_path }}</code></a></dd>
         {% endif %}
         {% if let Some(url) = noc.proposal_url %}
         <dt>Proposal</dt>
