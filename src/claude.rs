@@ -69,6 +69,11 @@ pub fn run(
     let output_file = fs::File::create(log_file).context("Failed to create log file")?;
     let stderr_file = output_file.try_clone()?;
 
+    // `--dangerously-skip-permissions` is required for unattended operation: Claude cannot
+    // prompt for permission approvals when running non-interactively. This means the spawned
+    // process has unrestricted filesystem and command execution access. Task descriptions
+    // become untrusted code execution vectors — see the "Security / Trust Model" section in
+    // CLAUDE.md for the full trust boundary analysis and operator guidance.
     let mut args = vec!["-p", "--dangerously-skip-permissions", "--model", model];
     let budget_str;
     if let Some(b) = ctx.max_budget {

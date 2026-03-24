@@ -91,6 +91,25 @@ Prompt content can be extended per project without modifying the built-in templa
 
 Shared content is appended before template-specific content.
 
+## Security / Trust Model
+
+nocturnal invokes Claude with `--dangerously-skip-permissions`, which grants the spawned process unrestricted filesystem and command execution access. This is required for unattended operation — Claude cannot prompt the user for permission approvals at runtime.
+
+**Consequences operators must understand:**
+
+1. **Task descriptions are untrusted code execution vectors.** Any text in a `td` task title, description, or acceptance criteria is passed as a prompt to Claude running with full permissions. A malicious or malformed task could instruct Claude to exfiltrate files, modify system configuration, or run arbitrary commands.
+
+2. **Worktree isolation is the primary containment boundary — not a security boundary.** Each task runs in an isolated git worktree (`nocturnal/<task-id>`), which limits the blast radius for accidental file changes to that branch. It does not prevent reads across the filesystem, network access, or execution of system binaries.
+
+3. **Operators accept full code-execution risk for any task text.** Only feed tasks into nocturnal that you would be comfortable running as a shell script under your user account. Treat the `td` task database as a trusted execution surface.
+
+**Mitigation strategies:**
+
+- Run nocturnal under a dedicated low-privilege OS user with restricted filesystem access
+- Use `max_budget` in `.nocturnal.toml` to cap spend per run
+- Review task descriptions before they enter the `open` queue
+- Monitor `$TMPDIR/nocturnal-logs/` for unexpected command output
+
 ## Rust Conventions
 
 - External commands (`td`, `git`, `claude`, `glab`/`gh`) are invoked via `std::process::Command`

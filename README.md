@@ -252,6 +252,12 @@ ls -lt ${TMPDIR}/nocturnal-logs/
 
 Log files are named `<phase>-<task-id>-<timestamp>.log` and contain the full Claude output for each run.
 
+## Security
+
+nocturnal runs Claude with `--dangerously-skip-permissions`, giving it unrestricted filesystem and command execution access. Task descriptions are untrusted input that can execute arbitrary code under your user account. Worktree isolation limits accidental branch-level changes but is not a security boundary.
+
+See the **Security / Trust Model** section in `CLAUDE.md` for the full trust boundary analysis and recommended mitigations.
+
 ## License
 
 MIT
