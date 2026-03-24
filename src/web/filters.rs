@@ -1,6 +1,6 @@
 use chrono::DateTime;
 
-pub fn format_date(s: &str) -> askama::Result<String> {
+pub fn format_date(s: &str, _values: &dyn askama::Values) -> askama::Result<String> {
     if s.is_empty() {
         return Ok(String::new());
     }
@@ -10,7 +10,7 @@ pub fn format_date(s: &str) -> askama::Result<String> {
     }
 }
 
-pub fn format_datetime(s: &str) -> askama::Result<String> {
+pub fn format_datetime(s: &str, _values: &dyn askama::Values) -> askama::Result<String> {
     if s.is_empty() {
         return Ok(String::new());
     }

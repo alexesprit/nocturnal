@@ -119,11 +119,15 @@ struct IssueTableErrorTemplate {
 mod filters {
     pub use crate::web::filters::{format_date, format_datetime};
 
-    pub fn render_markdown(s: &str) -> askama::Result<String> {
+    pub fn render_markdown(s: &str, _values: &dyn askama::Values) -> askama::Result<String> {
         Ok(crate::web::markdown::render(s))
     }
 
-    pub fn join_labels(labels: &[String], sep: &str) -> askama::Result<String> {
+    pub fn join_labels(
+        labels: &[String],
+        _values: &dyn askama::Values,
+        sep: &str,
+    ) -> askama::Result<String> {
         Ok(labels.join(sep))
     }
 }
