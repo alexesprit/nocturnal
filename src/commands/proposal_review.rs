@@ -211,6 +211,12 @@ pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
     td_client
         .comment(task_id, &format!("Proposal opened: {comment_url}"))
         .ok();
+    td_client
+        .log(&format!(
+            "Created {platform} proposal #{} for {task_id}",
+            proposal.id
+        ))
+        .ok();
 
     Ok(())
 }
