@@ -117,7 +117,7 @@ nocturnal proposal-rotate
 
 ### Recommended Schedule
 
-Run `develop-rotate` nightly to implement/review tasks, and `proposal-rotate` frequently (e.g. every hour) to address MR/PR comments promptly. The two commands use separate locks and operate on disjoint task states, so they can run concurrently without conflict.
+Run `develop-rotate` in overnight batches on weeknights to implement and review tasks. Run `proposal-rotate` every 15 minutes to respond promptly to MR/PR comments. The two commands use separate locks and operate on disjoint task states, so they can run concurrently without conflict.
 
 #### cron
 
@@ -131,33 +131,90 @@ Run `develop-rotate` nightly to implement/review tasks, and `proposal-rotate` fr
 
 #### launchd
 
-Nightly rotation (`~/Library/LaunchAgents/com.nocturnal.rotate.plist`):
+`~/Library/LaunchAgents/com.nocturnal.develop-rotate.plist`:
 
 ```xml
-<key>ProgramArguments</key>
-<array>
-  <string>/path/to/nocturnal</string>
-  <string>develop-rotate</string>
-</array>
-<key>StartCalendarInterval</key>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
 <dict>
-  <key>Hour</key>
-  <integer>2</integer>
-  <key>Minute</key>
-  <integer>0</integer>
+  <key>Label</key>
+  <string>com.nocturnal.develop-rotate</string>
+
+  <!-- Use a login shell so PATH includes Homebrew, cargo, etc. -->
+  <!-- caffeinate -s prevents macOS sleep during long Claude runs -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-l</string>
+    <string>-c</string>
+    <string>caffeinate -s nocturnal develop-rotate</string>
+  </array>
+
+  <!-- Weekday overnight batch: 1 AM, 2 AM, 3 AM Mon–Fri -->
+  <!-- Add or remove entries to match your preferred schedule -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Hour</key><integer>1</integer>
+      <key>Minute</key><integer>0</integer>
+      <key>Weekday</key><integer>1</integer>
+    </dict>
+    <dict>
+      <key>Hour</key><integer>2</integer>
+      <key>Minute</key><integer>0</integer>
+      <key>Weekday</key><integer>1</integer>
+    </dict>
+    <dict>
+      <key>Hour</key><integer>3</integer>
+      <key>Minute</key><integer>0</integer>
+      <key>Weekday</key><integer>1</integer>
+    </dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/nocturnal-logs/launchd-develop-rotate.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/nocturnal-logs/launchd-develop-rotate.log</string>
 </dict>
+</plist>
 ```
 
-Proposal review every hour (`~/Library/LaunchAgents/com.nocturnal.proposal-review.plist`):
+`~/Library/LaunchAgents/com.nocturnal.proposal-rotate.plist`:
 
 ```xml
-<key>ProgramArguments</key>
-<array>
-  <string>/path/to/nocturnal</string>
-  <string>proposal-rotate</string>
-</array>
-<key>StartInterval</key>
-<integer>3600</integer>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nocturnal.proposal-rotate</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-l</string>
+    <string>-c</string>
+    <string>nocturnal proposal-rotate</string>
+  </array>
+
+  <!-- Every 15 minutes -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Minute</key><integer>15</integer></dict>
+    <dict><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Minute</key><integer>45</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/nocturnal-logs/launchd-proposal-rotate.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/nocturnal-logs/launchd-proposal-rotate.log</string>
+</dict>
+</plist>
 ```
 
 ## Configuration
