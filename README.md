@@ -152,7 +152,7 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
     <string>caffeinate -s nocturnal develop-rotate</string>
   </array>
 
-  <!-- Weekday overnight batch: 1 AM, 2 AM, 3 AM Mon–Fri -->
+  <!-- Overnight batch: 1 AM, 2 AM, 3 AM Monday; daytime: 2 PM Monday -->
   <!-- Add or remove entries to match your preferred schedule -->
   <key>StartCalendarInterval</key>
   <array>
@@ -168,6 +168,11 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
     </dict>
     <dict>
       <key>Hour</key><integer>3</integer>
+      <key>Minute</key><integer>0</integer>
+      <key>Weekday</key><integer>1</integer>
+    </dict>
+    <dict>
+      <key>Hour</key><integer>14</integer>
       <key>Minute</key><integer>0</integer>
       <key>Weekday</key><integer>1</integer>
     </dict>
