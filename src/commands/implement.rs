@@ -46,7 +46,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     }
 
     let wt_path = git::ensure_worktree(&ctx.project_root, task_id, &ctx.base_branch)?;
-    info!("Worktree: {wt_path}");
+    info!("Worktree: {}", wt_path.display());
 
     // best-effort: task may already be in_progress from a previous attempt
     td.start(task_id).ok();
@@ -80,7 +80,8 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     } else {
         error!("Implementation failed (exit code nonzero)");
         td.log(&format!(
-            "Orchestrator: implementation failed — see {log_file}"
+            "Orchestrator: implementation failed — see {}",
+            log_file.display()
         ))
         .ok();
         Ok(false)

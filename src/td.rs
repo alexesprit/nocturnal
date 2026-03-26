@@ -148,17 +148,17 @@ impl Default for ListOpts {
 }
 
 pub struct Td<'a> {
-    project_root: &'a str,
+    project_root: &'a std::path::Path,
 }
 
 impl<'a> Td<'a> {
-    pub fn new(project_root: &'a str) -> Self {
+    pub fn new(project_root: &'a std::path::Path) -> Self {
         Self { project_root }
     }
 
     fn cmd(&self) -> Command {
         let mut cmd = Command::new("td");
-        cmd.args(["-w", self.project_root]);
+        cmd.arg("-w").arg(self.project_root);
         cmd
     }
 

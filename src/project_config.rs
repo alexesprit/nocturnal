@@ -85,8 +85,8 @@ fn resolve_merge_strategy(vcs: &VcsConfig) -> MergeStrategy {
         })
 }
 
-pub fn load_project_settings(project_root: &str) -> ProjectSettings {
-    let path = Path::new(project_root).join(".nocturnal.toml");
+pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
+    let path = project_root.join(".nocturnal.toml");
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return ProjectSettings::default(),
@@ -185,7 +185,7 @@ fn validate_branch_name(name: &str) -> bool {
 }
 
 /// Convenience wrapper kept for callers that only need vcs mode.
-pub fn load_vcs_mode(project_root: &str) -> VcsMode {
+pub fn load_vcs_mode(project_root: &Path) -> VcsMode {
     load_project_settings(project_root).vcs_mode
 }
 
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn load_from_nonexistent_dir() {
-        assert_eq!(load_vcs_mode("/nonexistent/path"), VcsMode::Off);
+        assert_eq!(load_vcs_mode(Path::new("/nonexistent/path")), VcsMode::Off);
     }
 
     #[test]
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn auto_merge_defaults_to_true() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert!(settings.auto_merge);
     }
 
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn delete_branch_on_merge_defaults_to_false() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert!(!settings.delete_branch_on_merge);
     }
 
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn defaults_when_fields_missing() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert_eq!(settings.max_reviews, DEFAULT_MAX_REVIEWS);
         assert_eq!(settings.max_budget, DEFAULT_MAX_BUDGET);
         assert_eq!(settings.implement_model, DEFAULT_MODEL);
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn no_claude_section_uses_default_model() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert_eq!(settings.implement_model, DEFAULT_MODEL);
         assert_eq!(settings.review_model, DEFAULT_MODEL);
     }
@@ -392,7 +392,7 @@ mod tests {
 
     #[test]
     fn merge_strategy_defaults_to_ff() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert_eq!(settings.merge_strategy, MergeStrategy::Ff);
     }
 
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn target_branch_defaults_to_main() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert_eq!(settings.target_branch, "main");
     }
 
@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn post_merge_hooks_default_to_empty() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert!(settings.post_merge_hooks.is_empty());
     }
 
@@ -492,7 +492,7 @@ mod tests {
 
     #[test]
     fn pre_merge_hooks_default_to_empty() {
-        let settings = load_project_settings("/nonexistent/path");
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
         assert!(settings.pre_merge_hooks.is_empty());
     }
 

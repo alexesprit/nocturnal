@@ -92,8 +92,8 @@ fn run(cli: Cli) -> Result<()> {
         Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
         _ => {
             let project_root = match cli.project {
-                Some(p) => p,
-                None => std::env::current_dir()?.display().to_string(),
+                Some(p) => std::path::PathBuf::from(p),
+                None => std::env::current_dir()?,
             };
             config::check_td_init(&project_root)?;
 

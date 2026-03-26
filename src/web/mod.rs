@@ -3,6 +3,7 @@ pub mod handlers;
 pub mod markdown;
 pub mod models;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::Router;
@@ -16,14 +17,14 @@ struct StaticAssets;
 
 pub struct ProjectEntry {
     pub name: String,
-    pub path: String,
+    pub path: PathBuf,
     pub max_reviews: u32,
 }
 
 pub struct AppState {
     pub projects: Vec<ProjectEntry>,
-    pub lock_dir: String,
-    pub log_dir: String,
+    pub lock_dir: PathBuf,
+    pub log_dir: PathBuf,
     pub rotation_state_file: String,
 }
 

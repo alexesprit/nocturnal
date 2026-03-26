@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
@@ -41,7 +41,10 @@ fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
             continue;
         }
 
-        info!("gc: removing worktree for {task_id} (status: {status}): {wt_path}");
+        info!(
+            "gc: removing worktree for {task_id} (status: {status}): {}",
+            wt_path.display()
+        );
 
         let branch = format!("nocturnal/{task_id}");
         let rm_status = Command::new("git")
@@ -51,14 +54,17 @@ fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
 
         match rm_status {
             Ok(s) if s.success() => {
-                println!("  removed worktree: {wt_path} ({task_id})");
+                println!("  removed worktree: {} ({task_id})", wt_path.display());
                 removed += 1;
             }
             Ok(s) => {
-                info!("gc: git gtr rm failed for {wt_path} (exit: {s})");
+                info!(
+                    "gc: git gtr rm failed for {} (exit: {s})",
+                    wt_path.display()
+                );
             }
             Err(e) => {
-                info!("gc: git gtr rm error for {wt_path}: {e:#}");
+                info!("gc: git gtr rm error for {}: {e:#}", wt_path.display());
             }
         }
     }
@@ -66,15 +72,14 @@ fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
     Ok(removed)
 }
 
-fn gc_stale_locks(lock_dir: &str) -> Result<usize> {
-    let dir = PathBuf::from(lock_dir);
-    if !dir.is_dir() {
+fn gc_stale_locks(lock_dir: &Path) -> Result<usize> {
+    if !lock_dir.is_dir() {
         return Ok(0);
     }
 
     let mut removed = 0;
 
-    let entries = fs::read_dir(&dir)?;
+    let entries = fs::read_dir(lock_dir)?;
     for entry in entries.flatten() {
         let path = entry.path();
         if !path.is_dir() {

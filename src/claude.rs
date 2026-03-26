@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 
@@ -8,18 +9,17 @@ use tracing::info;
 use crate::activity;
 use crate::config::ProjectContext;
 
-pub fn log_path(log_dir: &str, command: &str, task_id: &str) -> String {
+pub fn log_path(log_dir: &Path, command: &str, task_id: &str) -> PathBuf {
     debug_assert!(
         crate::td::validate_task_id(task_id).is_ok(),
         "task_id must be validated before constructing log path: {task_id:?}"
     );
-    format!(
-        "{}/{}-{}-{}.log",
-        log_dir,
+    log_dir.join(format!(
+        "{}-{}-{}.log",
         command,
         task_id,
         chrono::Local::now().format("%Y%m%d-%H%M%S")
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -28,16 +28,18 @@ mod tests {
 
     #[test]
     fn log_path_contains_all_components() {
-        let path = log_path("/tmp/logs", "implement", "task-42");
-        assert!(path.starts_with("/tmp/logs/implement-task-42-"));
-        assert!(path.ends_with(".log"));
+        let path = log_path(Path::new("/tmp/logs"), "implement", "task-42");
+        let s = path.to_string_lossy();
+        assert!(s.starts_with("/tmp/logs/implement-task-42-"));
+        assert!(s.ends_with(".log"));
     }
 
     #[test]
     fn log_path_format_has_timestamp() {
-        let path = log_path("/logs", "review", "t1");
+        let path = log_path(Path::new("/logs"), "review", "t1");
+        let s = path.to_string_lossy();
         // Format: /logs/review-t1-YYYYMMDD-HHMMSS.log
-        let suffix = path.strip_prefix("/logs/review-t1-").unwrap();
+        let suffix = s.strip_prefix("/logs/review-t1-").unwrap();
         let timestamp = suffix.strip_suffix(".log").unwrap();
         // Should be like "20260316-143052"
         assert_eq!(timestamp.len(), 15);
@@ -47,9 +49,9 @@ mod tests {
 
 pub fn run(
     ctx: &ProjectContext,
-    wt_path: &str,
+    wt_path: &Path,
     prompt: &str,
-    log_file: &str,
+    log_file: &Path,
     command_name: &str,
     project: &str,
     task_id: &str,
@@ -61,7 +63,7 @@ pub fn run(
         Some(b) => info!("Running Claude (model={model}, budget=${b})..."),
         None => info!("Running Claude (model={model}, budget=unlimited)..."),
     }
-    info!("Log: {log_file}");
+    info!("Log: {}", log_file.display());
 
     let started_at = chrono::Local::now();
     let timer = Instant::now();

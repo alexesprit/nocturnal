@@ -1,3 +1,4 @@
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
@@ -26,7 +27,7 @@ mod tests {
 
 /// Parse `git worktree list --porcelain` and return `(worktree_path, task_id)` pairs
 /// for all worktrees on branches matching `refs/heads/nocturnal/<task_id>`.
-pub fn list_nocturnal_worktrees(project_root: &str) -> Result<Vec<(String, String)>> {
+pub fn list_nocturnal_worktrees(project_root: &Path) -> Result<Vec<(PathBuf, String)>> {
     let output = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
         .current_dir(project_root)
@@ -35,11 +36,11 @@ pub fn list_nocturnal_worktrees(project_root: &str) -> Result<Vec<(String, Strin
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut result = Vec::new();
-    let mut current_path: Option<String> = None;
+    let mut current_path: Option<PathBuf> = None;
 
     for line in stdout.lines() {
         if let Some(path) = line.strip_prefix("worktree ") {
-            current_path = Some(path.to_string());
+            current_path = Some(PathBuf::from(path));
         } else if let Some(task_id) = line.strip_prefix("branch refs/heads/nocturnal/") {
             if let Some(path) = current_path.take() {
                 result.push((path, task_id.to_string()));
@@ -50,7 +51,7 @@ pub fn list_nocturnal_worktrees(project_root: &str) -> Result<Vec<(String, Strin
     Ok(result)
 }
 
-pub fn worktree_path(project_root: &str, task_id: &str) -> Result<Option<String>> {
+pub fn worktree_path(project_root: &Path, task_id: &str) -> Result<Option<PathBuf>> {
     let worktrees = list_nocturnal_worktrees(project_root)?;
     Ok(worktrees
         .into_iter()
@@ -58,7 +59,7 @@ pub fn worktree_path(project_root: &str, task_id: &str) -> Result<Option<String>
         .map(|(path, _)| path))
 }
 
-fn fetch_branch(project_root: &str, branch: &str) {
+fn fetch_branch(project_root: &Path, branch: &str) {
     let status = Command::new("git")
         .args(["fetch", "origin", branch])
         .current_dir(project_root)
@@ -75,7 +76,7 @@ fn fetch_branch(project_root: &str, branch: &str) {
     }
 }
 
-pub fn ensure_worktree(project_root: &str, task_id: &str, base_branch: &str) -> Result<String> {
+pub fn ensure_worktree(project_root: &Path, task_id: &str, base_branch: &str) -> Result<PathBuf> {
     if let Some(path) = worktree_path(project_root, task_id)? {
         return Ok(path);
     }
@@ -106,7 +107,7 @@ pub fn ensure_worktree(project_root: &str, task_id: &str, base_branch: &str) -> 
 }
 
 /// Check if `potential_ancestor` is an ancestor of `branch`.
-pub fn is_ancestor(project_root: &str, potential_ancestor: &str, branch: &str) -> Result<bool> {
+pub fn is_ancestor(project_root: &Path, potential_ancestor: &str, branch: &str) -> Result<bool> {
     let status = Command::new("git")
         .args(["merge-base", "--is-ancestor", potential_ancestor, branch])
         .current_dir(project_root)
@@ -117,7 +118,7 @@ pub fn is_ancestor(project_root: &str, potential_ancestor: &str, branch: &str) -
 
 /// Fast-forward merge: atomically update `target_branch` ref to `source_branch` without checkout.
 /// If `target_branch` is currently checked out, also updates the working tree.
-pub fn merge_ff_only(project_root: &str, target_branch: &str, source_branch: &str) -> Result<()> {
+pub fn merge_ff_only(project_root: &Path, target_branch: &str, source_branch: &str) -> Result<()> {
     let checked_out = current_branch(project_root)
         .map(|b| b == target_branch)
         .unwrap_or(false);
@@ -163,7 +164,7 @@ pub fn merge_ff_only(project_root: &str, target_branch: &str, source_branch: &st
 }
 
 /// Returns the current branch name, or None if HEAD is detached.
-fn current_branch(project_root: &str) -> Option<String> {
+fn current_branch(project_root: &Path) -> Option<String> {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(project_root)
@@ -179,7 +180,7 @@ fn current_branch(project_root: &str) -> Option<String> {
 
 /// Merge with a merge commit. Requires a clean working tree in the project root.
 /// Uses a Drop guard to restore the original branch on error/panic.
-pub fn merge_no_ff(project_root: &str, target_branch: &str, source_branch: &str) -> Result<()> {
+pub fn merge_no_ff(project_root: &Path, target_branch: &str, source_branch: &str) -> Result<()> {
     // Check working tree is clean
     let status_output = Command::new("git")
         .args(["status", "--porcelain"])
@@ -188,7 +189,10 @@ pub fn merge_no_ff(project_root: &str, target_branch: &str, source_branch: &str)
         .context("Failed to check git status")?;
     let porcelain = String::from_utf8_lossy(&status_output.stdout);
     if !porcelain.trim().is_empty() {
-        bail!("Working tree is not clean in {project_root} — cannot perform no-ff merge");
+        bail!(
+            "Working tree is not clean in {} — cannot perform no-ff merge",
+            project_root.display()
+        );
     }
 
     // Record original branch (bail on detached HEAD)
@@ -197,7 +201,7 @@ pub fn merge_no_ff(project_root: &str, target_branch: &str, source_branch: &str)
 
     // Drop guard to restore original branch on error/panic
     struct BranchGuard<'a> {
-        project_root: &'a str,
+        project_root: &'a Path,
         original_branch: String,
         armed: bool,
     }
@@ -260,10 +264,10 @@ pub fn merge_no_ff(project_root: &str, target_branch: &str, source_branch: &str)
 
 /// Rebase source branch onto target, then fast-forward target to source.
 pub fn rebase_and_merge(
-    project_root: &str,
+    project_root: &Path,
     target_branch: &str,
     source_branch: &str,
-    wt_path: &str,
+    wt_path: &Path,
 ) -> Result<()> {
     // Rebase in the worktree
     let output = Command::new("git")
@@ -295,7 +299,7 @@ pub fn rebase_and_merge(
     merge_ff_only(project_root, target_branch, source_branch)
 }
 
-pub fn remote_url(project_root: &str) -> Option<String> {
+pub fn remote_url(project_root: &Path) -> Option<String> {
     Command::new("git")
         .args(["remote", "get-url", "origin"])
         .current_dir(project_root)
@@ -305,7 +309,7 @@ pub fn remote_url(project_root: &str) -> Option<String> {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
 }
 
-pub fn push_branch(wt_path: &str, branch: &str) -> Result<()> {
+pub fn push_branch(wt_path: &Path, branch: &str) -> Result<()> {
     retry("git", || {
         let status = Command::new("git")
             .args(["push", "origin", branch, "--set-upstream"])
@@ -320,7 +324,7 @@ pub fn push_branch(wt_path: &str, branch: &str) -> Result<()> {
     })
 }
 
-pub fn remote_reachable(wt_path: &str) -> bool {
+pub fn remote_reachable(wt_path: &Path) -> bool {
     Command::new("git")
         .args(["ls-remote", "--exit-code", "origin"])
         .current_dir(wt_path)

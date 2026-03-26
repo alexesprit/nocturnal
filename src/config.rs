@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 
@@ -8,8 +8,8 @@ use crate::project_config::{self, MergeStrategy, VcsMode};
 
 #[derive(Clone)]
 pub struct Config {
-    pub lock_dir: String,
-    pub log_dir: String,
+    pub lock_dir: PathBuf,
+    pub log_dir: PathBuf,
     pub projects_file: String,
     pub rotation_state_file: String,
     pub dry_run: bool,
@@ -17,7 +17,7 @@ pub struct Config {
 
 pub struct ProjectContext {
     pub cfg: Config,
-    pub project_root: String,
+    pub project_root: PathBuf,
     pub vcs_mode: VcsMode,
     pub auto_merge: bool,
     pub delete_branch_on_merge: bool,
@@ -33,7 +33,7 @@ pub struct ProjectContext {
 }
 
 impl ProjectContext {
-    pub fn new(cfg: Config, project_root: String) -> Self {
+    pub fn new(cfg: Config, project_root: PathBuf) -> Self {
         let settings = project_config::load_project_settings(&project_root);
         Self {
             cfg,
@@ -58,10 +58,10 @@ impl ProjectContext {
     }
 }
 
-pub fn project_slug(project_root: &str) -> String {
+pub fn project_slug(project_root: &Path) -> String {
     project_root
-        .rsplit('/')
-        .next()
+        .file_name()
+        .and_then(|n| n.to_str())
         .unwrap_or("")
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
@@ -78,9 +78,13 @@ impl Config {
         });
 
         Config {
-            lock_dir: env::var("NOCTURNAL_LOCK_DIR").unwrap_or_else(|_| tmpdir.clone()),
-            log_dir: env::var("NOCTURNAL_LOG_DIR")
-                .unwrap_or_else(|_| format!("{tmpdir}/nocturnal-logs")),
+            lock_dir: PathBuf::from(
+                env::var("NOCTURNAL_LOCK_DIR").unwrap_or_else(|_| tmpdir.clone()),
+            ),
+            log_dir: PathBuf::from(
+                env::var("NOCTURNAL_LOG_DIR")
+                    .unwrap_or_else(|_| format!("{tmpdir}/nocturnal-logs")),
+            ),
             projects_file: env::var("NOCTURNAL_PROJECTS_FILE")
                 .unwrap_or_else(|_| format!("{home}/.config/nocturnal/projects")),
             rotation_state_file: env::var("NOCTURNAL_ROTATION_STATE")
@@ -105,9 +109,12 @@ impl Config {
     }
 }
 
-pub fn check_td_init(project_root: &str) -> Result<()> {
-    if !Path::new(project_root).join(".todos").is_dir() {
-        bail!("td not initialized in {project_root} (run 'td init')");
+pub fn check_td_init(project_root: &Path) -> Result<()> {
+    if !project_root.join(".todos").is_dir() {
+        bail!(
+            "td not initialized in {} (run 'td init')",
+            project_root.display()
+        );
     }
     Ok(())
 }
@@ -118,37 +125,46 @@ mod tests {
 
     #[test]
     fn slug_from_simple_path() {
-        assert_eq!(project_slug("/home/user/my-project"), "my-project");
+        assert_eq!(
+            project_slug(Path::new("/home/user/my-project")),
+            "my-project"
+        );
     }
 
     #[test]
     fn slug_strips_special_characters() {
-        assert_eq!(project_slug("/path/to/my project!@#"), "myproject");
+        assert_eq!(
+            project_slug(Path::new("/path/to/my project!@#")),
+            "myproject"
+        );
     }
 
     #[test]
     fn slug_preserves_underscores_and_dashes() {
-        assert_eq!(project_slug("/path/my_cool-project"), "my_cool-project");
+        assert_eq!(
+            project_slug(Path::new("/path/my_cool-project")),
+            "my_cool-project"
+        );
     }
 
     #[test]
     fn slug_from_path_without_slashes() {
-        assert_eq!(project_slug("project"), "project");
+        assert_eq!(project_slug(Path::new("project")), "project");
     }
 
     #[test]
     fn slug_from_empty_string() {
-        assert_eq!(project_slug(""), "");
+        assert_eq!(project_slug(Path::new("")), "");
     }
 
     #[test]
     fn slug_from_trailing_slash() {
-        // rsplit('/').next() on "foo/" gives ""
-        assert_eq!(project_slug("/path/to/project/"), "");
+        // Path::file_name() strips trailing slashes, so this now returns the correct slug
+        assert_eq!(project_slug(Path::new("/path/to/project/")), "project");
     }
 
     #[test]
     fn slug_from_root_path() {
-        assert_eq!(project_slug("/"), "");
+        assert_eq!(project_slug(Path::new("/")), "");
     }
 }

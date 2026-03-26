@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use tracing::{info, warn};
@@ -9,8 +9,8 @@ pub struct Lock {
 }
 
 impl Lock {
-    pub fn acquire(lock_dir: &str, name: &str) -> Result<Self> {
-        let path = PathBuf::from(lock_dir).join(format!("nocturnal.{name}.lock"));
+    pub fn acquire(lock_dir: &Path, name: &str) -> Result<Self> {
+        let path = lock_dir.join(format!("nocturnal.{name}.lock"));
 
         if fs::create_dir(&path).is_err() {
             // Check if holding process is still alive
@@ -37,7 +37,7 @@ impl Lock {
         Ok(Lock { path })
     }
 
-    pub fn try_acquire(lock_dir: &str, name: &str) -> Option<Self> {
+    pub fn try_acquire(lock_dir: &Path, name: &str) -> Option<Self> {
         Self::acquire(lock_dir, name).ok()
     }
 }

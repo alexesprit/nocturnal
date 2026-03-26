@@ -1,3 +1,5 @@
+use std::path::Path;
+
 const IMPLEMENT: &str = include_str!("../prompts/implement.md");
 const REVIEW: &str = include_str!("../prompts/review.md");
 const PROPOSAL_REVIEW: &str = include_str!("../prompts/proposal-review.md");
@@ -26,14 +28,13 @@ impl Template {
     }
 }
 
-fn append_extra(prompt: &mut String, project_root: &str, template: &Template) {
-    let dir = format!("{}/.nocturnal", project_root);
-    if let Ok(shared) = std::fs::read_to_string(format!("{}/prompt-extra.md", dir)) {
+fn append_extra(prompt: &mut String, project_root: &Path, template: &Template) {
+    let dir = project_root.join(".nocturnal");
+    if let Ok(shared) = std::fs::read_to_string(dir.join("prompt-extra.md")) {
         prompt.push('\n');
         prompt.push_str(&shared);
     }
-    if let Ok(specific) = std::fs::read_to_string(format!("{}/{}", dir, template.extra_filename()))
-    {
+    if let Ok(specific) = std::fs::read_to_string(dir.join(template.extra_filename())) {
         prompt.push('\n');
         prompt.push_str(&specific);
     }
@@ -42,7 +43,7 @@ fn append_extra(prompt: &mut String, project_root: &str, template: &Template) {
 pub fn render_with_review_cycle(
     template: Template,
     task_id: &str,
-    project_root: &str,
+    project_root: &Path,
     max_reviews: u32,
     review_cycle: Option<u32>,
     base_branch: &str,
@@ -57,7 +58,7 @@ pub fn render_with_review_cycle(
 pub fn render_with_vcs(
     template: Template,
     task_id: &str,
-    project_root: &str,
+    project_root: &Path,
     max_reviews: u32,
     vcs_reply_cmd: &str,
     vcs_inline_reply_instructions: &str,
@@ -76,14 +77,15 @@ pub fn render_with_vcs(
 pub fn render_base(
     template: Template,
     task_id: &str,
-    project_root: &str,
+    project_root: &Path,
     max_reviews: u32,
     base_branch: &str,
 ) -> String {
+    let project_root_str = project_root.to_str().unwrap_or("");
     let mut result = template
         .content()
         .replace("{{TASK_ID}}", task_id)
-        .replace("{{PROJECT_ROOT}}", project_root)
+        .replace("{{PROJECT_ROOT}}", project_root_str)
         .replace("{{MAX_REVIEWS}}", &max_reviews.to_string())
         .replace("{{BASE_BRANCH}}", base_branch);
     append_extra(&mut result, project_root, &template);
@@ -104,7 +106,13 @@ mod tests {
 
     #[test]
     fn render_base_replaces_all_base_placeholders() {
-        let result = render_base(Template::Implement, "task-42", "/home/project", 5, "main");
+        let result = render_base(
+            Template::Implement,
+            "task-42",
+            Path::new("/home/project"),
+            5,
+            "main",
+        );
         assert!(!result.contains("{{TASK_ID}}"));
         assert!(!result.contains("{{PROJECT_ROOT}}"));
         assert!(!result.contains("{{MAX_REVIEWS}}"));
@@ -116,15 +124,28 @@ mod tests {
 
     #[test]
     fn render_with_review_cycle_replaces_cycle_placeholder() {
-        let result =
-            render_with_review_cycle(Template::Review, "task-1", "/root", 3, Some(2), "main");
+        let result = render_with_review_cycle(
+            Template::Review,
+            "task-1",
+            Path::new("/root"),
+            3,
+            Some(2),
+            "main",
+        );
         assert!(!result.contains("{{REVIEW_CYCLE}}"));
         assert!(result.contains("2"));
     }
 
     #[test]
     fn render_with_review_cycle_none_leaves_placeholder() {
-        let result = render_with_review_cycle(Template::Review, "task-1", "/root", 3, None, "main");
+        let result = render_with_review_cycle(
+            Template::Review,
+            "task-1",
+            Path::new("/root"),
+            3,
+            None,
+            "main",
+        );
         assert!(result.contains("{{REVIEW_CYCLE}}"));
     }
 
@@ -133,7 +154,7 @@ mod tests {
         let result = render_with_vcs(
             Template::ProposalReview,
             "task-1",
-            "/root",
+            Path::new("/root"),
             3,
             "glab mr note 42",
             "",
@@ -152,7 +173,7 @@ mod tests {
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-extra.md"), "shared content").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, tmp.to_str().unwrap(), &Template::Implement);
+        append_extra(&mut prompt, &tmp, &Template::Implement);
         assert!(prompt.contains("base"));
         assert!(prompt.contains("shared content"));
     }
@@ -163,7 +184,7 @@ mod tests {
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-implement.md"), "impl extra").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, tmp.to_str().unwrap(), &Template::Implement);
+        append_extra(&mut prompt, &tmp, &Template::Implement);
         assert!(prompt.contains("impl extra"));
     }
 
@@ -174,7 +195,7 @@ mod tests {
         fs::write(dir.join("prompt-extra.md"), "shared").unwrap();
         fs::write(dir.join("prompt-review.md"), "review extra").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, tmp.to_str().unwrap(), &Template::Review);
+        append_extra(&mut prompt, &tmp, &Template::Review);
         let shared_pos = prompt.find("shared").unwrap();
         let specific_pos = prompt.find("review extra").unwrap();
         assert!(
@@ -187,7 +208,7 @@ mod tests {
     fn append_extra_no_files_no_change() {
         let tmp = tempdir();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, tmp.to_str().unwrap(), &Template::Implement);
+        append_extra(&mut prompt, &tmp, &Template::Implement);
         assert_eq!(prompt, "base");
     }
 
@@ -197,7 +218,7 @@ mod tests {
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-review.md"), "review extra").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, tmp.to_str().unwrap(), &Template::Implement);
+        append_extra(&mut prompt, &tmp, &Template::Implement);
         assert!(!prompt.contains("review extra"));
     }
 
@@ -206,13 +227,7 @@ mod tests {
         let tmp = tempdir();
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-extra.md"), "SHARED_EXTRA").unwrap();
-        let result = render_base(
-            Template::Implement,
-            "task-1",
-            tmp.to_str().unwrap(),
-            3,
-            "main",
-        );
+        let result = render_base(Template::Implement, "task-1", &tmp, 3, "main");
         assert!(result.contains("SHARED_EXTRA"));
     }
 
@@ -235,7 +250,7 @@ mod tests {
             (Template::Review, "review"),
             (Template::ProposalReview, "proposal-review"),
         ] {
-            let result = render_base(template, "id", "/proj", 3, "main");
+            let result = render_base(template, "id", Path::new("/proj"), 3, "main");
             assert!(
                 !result.contains("{{TASK_ID}}"),
                 "{name} still contains {{{{TASK_ID}}}}"

@@ -1,10 +1,11 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
 use tokio::signal;
 use tracing::{info, warn};
 
-use crate::config::Config;
+use crate::config::{self, Config};
 use crate::project_config;
 use crate::web::{self, AppState, ProjectEntry};
 
@@ -12,13 +13,9 @@ pub fn run(cfg: &Config, addr: &str, port: u16) -> Result<()> {
     let projects: Vec<ProjectEntry> = cfg
         .projects_list()
         .into_iter()
-        .map(|path| {
-            let name = path
-                .trim_end_matches('/')
-                .rsplit('/')
-                .next()
-                .unwrap_or("")
-                .to_string();
+        .map(|path_str| {
+            let path = PathBuf::from(&path_str);
+            let name = config::project_slug(&path);
             let settings = project_config::load_project_settings(&path);
             ProjectEntry {
                 name,

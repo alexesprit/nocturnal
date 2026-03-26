@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{Result, bail};
 use tracing::{error, info};
 
@@ -16,35 +18,42 @@ pub fn run(cfg: &Config) -> Result<()> {
     let mut failed = 0;
 
     for project_root in &projects {
-        info!("=== Project: {project_root} ===");
+        let project_root = PathBuf::from(project_root);
+        info!("=== Project: {} ===", project_root.display());
 
-        if !std::path::Path::new(project_root).join(".todos").is_dir() {
-            error!("td not initialized in {project_root} — skipping");
+        if !project_root.join(".todos").is_dir() {
+            error!(
+                "td not initialized in {} — skipping",
+                project_root.display()
+            );
             continue;
         }
 
-        let slug = config::project_slug(project_root);
+        let slug = config::project_slug(&project_root);
         let lock_name = format!("run-{slug}");
 
         let _lock = match lock::Lock::try_acquire(&cfg.lock_dir, &lock_name) {
             Some(l) => l,
             None => {
-                info!("Skipping {project_root} — locked (another process running)");
+                info!(
+                    "Skipping {} — locked (another process running)",
+                    project_root.display()
+                );
                 continue;
             }
         };
 
-        let ctx = ProjectContext::new(cfg.clone(), project_root.to_string());
+        let ctx = ProjectContext::new(cfg.clone(), project_root.clone());
 
         if cfg.dry_run {
-            info!("dry-run: would process project {project_root}");
+            info!("dry-run: would process project {}", project_root.display());
             continue;
         }
 
         match super::run::run_inner(&ctx) {
             Ok(_) => {}
             Err(e) => {
-                error!("cmd_run failed for {project_root}: {e:#}");
+                error!("cmd_run failed for {}: {e:#}", project_root.display());
                 failed += 1;
             }
         }

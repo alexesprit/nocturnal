@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
@@ -20,7 +21,7 @@ impl std::fmt::Display for Platform {
     }
 }
 
-pub fn detect_platform(project_root: &str, vcs_mode: VcsMode) -> Option<Platform> {
+pub fn detect_platform(project_root: &Path, vcs_mode: VcsMode) -> Option<Platform> {
     match vcs_mode {
         VcsMode::Off | VcsMode::Local => return None,
         VcsMode::GitHub => return Some(Platform::GitHub),
@@ -45,7 +46,7 @@ pub struct Proposal {
 
 pub fn create_proposal(
     platform: Platform,
-    wt_path: &str,
+    wt_path: &Path,
     title: &str,
     description: &str,
     target_branch: &str,
@@ -121,7 +122,7 @@ pub fn create_proposal(
     })
 }
 
-pub fn delete_remote_branch(wt_path: &str, branch: &str) -> bool {
+pub fn delete_remote_branch(wt_path: &Path, branch: &str) -> bool {
     retry("VCS", || {
         let status = Command::new("git")
             .args(["push", "origin", "--delete", branch])
@@ -138,7 +139,7 @@ pub fn delete_remote_branch(wt_path: &str, branch: &str) -> bool {
     .is_ok()
 }
 
-pub fn enable_auto_merge(platform: Platform, wt_path: &str, proposal_id: &str) -> bool {
+pub fn enable_auto_merge(platform: Platform, wt_path: &Path, proposal_id: &str) -> bool {
     retry("VCS", || {
         let status = match platform {
             Platform::GitLab => Command::new("glab")
@@ -172,7 +173,7 @@ pub enum ProposalState {
 
 pub fn get_proposal_state(
     platform: Platform,
-    wt_path: &str,
+    wt_path: &Path,
     proposal_id: &str,
 ) -> Result<ProposalState> {
     retry("VCS", || {
@@ -217,7 +218,7 @@ pub fn get_proposal_state(
 
 pub fn fetch_unresolved_comments(
     platform: Platform,
-    wt_path: &str,
+    wt_path: &Path,
     proposal_id: &str,
 ) -> Result<String> {
     retry("VCS", || match platform {
@@ -358,11 +359,11 @@ pub fn fetch_unresolved_comments(
 
 /// Perform a local merge of the task's worktree branch into the target branch.
 pub fn local_merge(
-    project_root: &str,
+    project_root: &Path,
     task_id: &str,
     target_branch: &str,
     strategy: MergeStrategy,
-    wt_path: &str,
+    wt_path: &Path,
 ) -> Result<()> {
     let source_branch = crate::git::worktree_branch(task_id);
 
@@ -384,7 +385,7 @@ pub fn local_merge(
 }
 
 /// Run post-merge hook commands. Logs failures but does not abort on error.
-pub fn run_post_merge_hooks(project_root: &str, hooks: &[String]) {
+pub fn run_post_merge_hooks(project_root: &Path, hooks: &[String]) {
     for cmd in hooks {
         tracing::info!("Running post-merge hook: {cmd}");
         let output = Command::new("sh")
@@ -411,7 +412,7 @@ pub fn run_post_merge_hooks(project_root: &str, hooks: &[String]) {
 }
 
 /// Run pre-merge hook commands in the worktree. Returns Err on first failure.
-pub fn run_pre_merge_hooks(wt_path: &str, hooks: &[String]) -> Result<()> {
+pub fn run_pre_merge_hooks(wt_path: &Path, hooks: &[String]) -> Result<()> {
     for cmd in hooks {
         tracing::info!("Running pre-merge hook: {cmd}");
         let output = Command::new("sh")
@@ -441,7 +442,7 @@ pub fn run_pre_merge_hooks(wt_path: &str, hooks: &[String]) -> Result<()> {
     Ok(())
 }
 
-fn gh_owner_repo(wt_path: &str) -> Result<(String, String)> {
+fn gh_owner_repo(wt_path: &Path) -> Result<(String, String)> {
     let output = Command::new("gh")
         .args(["repo", "view", "--json", "owner,name"])
         .current_dir(wt_path)
@@ -519,18 +520,18 @@ mod tests {
 
     #[test]
     fn detect_platform_off() {
-        assert!(detect_platform("/unused", VcsMode::Off).is_none());
+        assert!(detect_platform(Path::new("/unused"), VcsMode::Off).is_none());
     }
 
     #[test]
     fn detect_platform_local() {
-        assert!(detect_platform("/unused", VcsMode::Local).is_none());
+        assert!(detect_platform(Path::new("/unused"), VcsMode::Local).is_none());
     }
 
     #[test]
     fn detect_platform_forced_github() {
         assert_eq!(
-            detect_platform("/unused", VcsMode::GitHub).unwrap(),
+            detect_platform(Path::new("/unused"), VcsMode::GitHub).unwrap(),
             Platform::GitHub
         );
     }
@@ -538,7 +539,7 @@ mod tests {
     #[test]
     fn detect_platform_forced_gitlab() {
         assert_eq!(
-            detect_platform("/unused", VcsMode::GitLab).unwrap(),
+            detect_platform(Path::new("/unused"), VcsMode::GitLab).unwrap(),
             Platform::GitLab
         );
     }
@@ -555,23 +556,23 @@ mod tests {
 
     #[test]
     fn pre_merge_hooks_empty_succeeds() {
-        assert!(run_pre_merge_hooks("/tmp", &[]).is_ok());
+        assert!(run_pre_merge_hooks(Path::new("/tmp"), &[]).is_ok());
     }
 
     #[test]
     fn pre_merge_hooks_success() {
-        assert!(run_pre_merge_hooks("/tmp", &["true".to_string()]).is_ok());
+        assert!(run_pre_merge_hooks(Path::new("/tmp"), &["true".to_string()]).is_ok());
     }
 
     #[test]
     fn pre_merge_hooks_failure() {
-        assert!(run_pre_merge_hooks("/tmp", &["false".to_string()]).is_err());
+        assert!(run_pre_merge_hooks(Path::new("/tmp"), &["false".to_string()]).is_err());
     }
 
     #[test]
     fn pre_merge_hooks_stops_on_first_failure() {
         let hooks = vec!["true".to_string(), "false".to_string(), "true".to_string()];
-        let err = run_pre_merge_hooks("/tmp", &hooks).unwrap_err();
+        let err = run_pre_merge_hooks(Path::new("/tmp"), &hooks).unwrap_err();
         assert!(err.to_string().contains("Pre-merge hook failed"));
     }
 }

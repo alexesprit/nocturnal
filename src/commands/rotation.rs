@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use tracing::{error, info};
@@ -35,26 +36,33 @@ pub fn rotate_projects(
     let mut idx = last_idx.map_or(0, |i| (i + 1) % count);
 
     while tried < count {
-        let project_root = &projects[idx];
+        let project_root = PathBuf::from(&projects[idx]);
         info!(
-            "=== Rotating to project {}/{count}: {project_root} ===",
-            idx + 1
+            "=== Rotating to project {}/{count}: {} ===",
+            idx + 1,
+            project_root.display()
         );
 
-        if !std::path::Path::new(project_root).join(".todos").is_dir() {
-            error!("td not initialized in {project_root} — skipping");
+        if !project_root.join(".todos").is_dir() {
+            error!(
+                "td not initialized in {} — skipping",
+                project_root.display()
+            );
             idx = (idx + 1) % count;
             tried += 1;
             continue;
         }
 
-        let slug = config::project_slug(project_root);
+        let slug = config::project_slug(&project_root);
         let lock_name = format!("{lock_prefix}-{slug}");
 
         let _lock = match lock::Lock::try_acquire(&cfg.lock_dir, &lock_name) {
             Some(l) => l,
             None => {
-                info!("Skipping {project_root} — locked (another process running)");
+                info!(
+                    "Skipping {} — locked (another process running)",
+                    project_root.display()
+                );
                 idx = (idx + 1) % count;
                 tried += 1;
                 continue;
@@ -64,7 +72,7 @@ pub fn rotate_projects(
         let ctx = ProjectContext::new(cfg.clone(), project_root.clone());
 
         if cfg.dry_run {
-            info!("dry-run: would process project {project_root}");
+            info!("dry-run: would process project {}", project_root.display());
             return Ok(());
         }
 
@@ -73,7 +81,10 @@ pub fn rotate_projects(
         match action(&ctx) {
             Ok(true) => return Ok(()),
             Ok(false) => {
-                info!("Nothing to do in {project_root}, trying next project");
+                info!(
+                    "Nothing to do in {}, trying next project",
+                    project_root.display()
+                );
             }
             Err(e) => return Err(e),
         }

@@ -17,9 +17,9 @@ pub struct Entry {
     pub success: bool,
 }
 
-pub fn record(log_dir: &str, entry: &Entry) {
+pub fn record(log_dir: &Path, entry: &Entry) {
     fs::create_dir_all(log_dir).ok();
-    let path = Path::new(log_dir).join(FILENAME);
+    let path = log_dir.join(FILENAME);
     let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
         return;
     };
@@ -29,8 +29,8 @@ pub fn record(log_dir: &str, entry: &Entry) {
     writeln!(file, "{json}").ok();
 }
 
-pub fn read_recent(log_dir: &str, limit: usize) -> Vec<Entry> {
-    let path = Path::new(log_dir).join(FILENAME);
+pub fn read_recent(log_dir: &Path, limit: usize) -> Vec<Entry> {
+    let path = log_dir.join(FILENAME);
     let Ok(file) = fs::File::open(path) else {
         return Vec::new();
     };
@@ -53,11 +53,11 @@ mod tests {
 
     #[test]
     fn round_trip() {
-        let dir = format!(
+        let dir = std::path::PathBuf::from(format!(
             "{}/nocturnal-activity-test-{}",
             std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string()),
             std::process::id()
-        );
+        ));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
 
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn read_empty_dir() {
-        let entries = read_recent("/nonexistent/path", 5);
+        let entries = read_recent(std::path::Path::new("/nonexistent/path"), 5);
         assert!(entries.is_empty());
     }
 }

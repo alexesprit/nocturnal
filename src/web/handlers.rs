@@ -1,3 +1,4 @@
+use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 
 use askama::Template;
@@ -156,7 +157,7 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
     let lock_dir = state.lock_dir.clone();
     let log_dir = state.log_dir.clone();
     let rotation_state_file = state.rotation_state_file.clone();
-    let project_paths: Vec<(String, String)> = state
+    let project_paths: Vec<(String, PathBuf)> = state
         .projects
         .iter()
         .map(|p| (p.name.clone(), p.path.clone()))
@@ -205,10 +206,11 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
 
 fn fetch_project_status(
     name: &str,
-    path: &str,
-    lock_dir: &str,
+    path: &FsPath,
+    lock_dir: &FsPath,
     _max_reviews: u32,
 ) -> ProjectStatus {
+    let path_str = path.to_string_lossy();
     let td = Td::new(path);
     let tasks = match td.list_all() {
         Ok(tasks) => tasks,
@@ -216,7 +218,7 @@ fn fetch_project_status(
             warn!("td list failed for {name}: {e}");
             return ProjectStatus {
                 name: name.to_string(),
-                path: path.to_string(),
+                path: path_str.into_owned(),
                 counts: StatusCounts::default(),
                 total: 0,
                 error: Some(e.to_string()),
@@ -275,7 +277,7 @@ fn fetch_project_status(
 
     ProjectStatus {
         name: name.to_string(),
-        path: path.to_string(),
+        path: path_str.into_owned(),
         counts,
         total,
         error: None,
@@ -283,7 +285,7 @@ fn fetch_project_status(
     }
 }
 
-fn collect_worktree_task_ids(project_path: &str) -> Vec<String> {
+fn collect_worktree_task_ids(project_path: &FsPath) -> Vec<String> {
     crate::git::list_nocturnal_worktrees(project_path)
         .unwrap_or_default()
         .into_iter()
@@ -291,14 +293,17 @@ fn collect_worktree_task_ids(project_path: &str) -> Vec<String> {
         .collect()
 }
 
-fn check_lock_status(lock_dir: &str, slug: &str) -> LockStatus {
-    let base = std::path::PathBuf::from(lock_dir);
+fn check_lock_status(lock_dir: &FsPath, slug: &str) -> LockStatus {
     // Check both develop (run-{slug}) and proposal ({proposal-{slug}) locks.
     let lock_names = [
         format!("nocturnal.run-{slug}.lock"),
         format!("nocturnal.proposal-{slug}.lock"),
     ];
-    let lock_path = match lock_names.iter().map(|n| base.join(n)).find(|p| p.is_dir()) {
+    let lock_path = match lock_names
+        .iter()
+        .map(|n| lock_dir.join(n))
+        .find(|p| p.is_dir())
+    {
         Some(p) => p,
         None => return LockStatus::Idle,
     };
@@ -323,8 +328,8 @@ fn check_lock_status(lock_dir: &str, slug: &str) -> LockStatus {
 
 fn fetch_orchestrator_status(
     rotation_state_file: &str,
-    log_dir: &str,
-    projects: &[(String, String)],
+    log_dir: &FsPath,
+    projects: &[(String, PathBuf)],
 ) -> OrchestratorStatus {
     let (current_project, next_project) = read_rotation_state(rotation_state_file, projects);
 
@@ -332,7 +337,7 @@ fn fetch_orchestrator_status(
         let path = projects
             .iter()
             .find(|(n, _)| n == name)
-            .map(|(_, p)| p.as_str())?;
+            .map(|(_, p)| p.as_path())?;
         fetch_next_task(path)
     });
 
@@ -355,7 +360,7 @@ fn fetch_orchestrator_status(
     }
 }
 
-fn fetch_next_task(project_path: &str) -> Option<NextTask> {
+fn fetch_next_task(project_path: &FsPath) -> Option<NextTask> {
     let td = Td::new(project_path);
     let vcs_mode = crate::project_config::load_vcs_mode(project_path);
     let check_proposals = crate::vcs::detect_platform(project_path, vcs_mode).is_some();
@@ -374,7 +379,7 @@ fn fetch_next_task(project_path: &str) -> Option<NextTask> {
 
 fn read_rotation_state(
     rotation_state_file: &str,
-    projects: &[(String, String)],
+    projects: &[(String, PathBuf)],
 ) -> (Option<String>, Option<String>) {
     if projects.is_empty() {
         return (None, None);
@@ -411,7 +416,7 @@ fn format_duration_secs(secs: u64) -> String {
     }
 }
 
-fn build_proposal_url(project_path: &str, proposal_id: &str) -> Option<(String, String)> {
+fn build_proposal_url(project_path: &FsPath, proposal_id: &str) -> Option<(String, String)> {
     let remote = crate::git::remote_url(project_path)?;
     let base_url = parse_remote_to_https_base(&remote)?;
 
@@ -447,7 +452,7 @@ fn derive_noc_state(
     labels: &[String],
     status: &str,
     max_reviews: u32,
-    project_path: &str,
+    project_path: &FsPath,
     issue_id: &str,
 ) -> Option<NocIssueState> {
     let review_count = labels.iter().find_map(|l| {
@@ -526,9 +531,15 @@ fn derive_noc_state(
     })
 }
 
-fn find_worktree_for_task(project_path: &str, task_id: &str) -> (Option<String>, Option<String>) {
+fn find_worktree_for_task(
+    project_path: &FsPath,
+    task_id: &str,
+) -> (Option<String>, Option<String>) {
     match crate::git::worktree_path(project_path, task_id) {
-        Ok(Some(path)) => (Some(path), Some(format!("nocturnal/{task_id}"))),
+        Ok(Some(path)) => (
+            Some(path.to_string_lossy().into_owned()),
+            Some(format!("nocturnal/{task_id}")),
+        ),
         _ => (None, None),
     }
 }
@@ -797,7 +808,7 @@ fn group_by_status(issues: Vec<Task>) -> (Vec<Task>, Vec<Task>, Vec<Task>, Vec<T
 
 pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
     let lock_dir = state.lock_dir.clone();
-    let project_paths_for_lock: Vec<String> =
+    let project_paths_for_lock: Vec<PathBuf> =
         state.projects.iter().map(|p| p.path.clone()).collect();
     let is_running = tokio::task::spawn_blocking(move || {
         project_paths_for_lock.iter().any(|path| {
@@ -880,7 +891,8 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
     };
 
     match std::process::Command::new(&exe)
-        .args(["develop", "--project", &project_path])
+        .args(["develop", "--project"])
+        .arg(&project_path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
