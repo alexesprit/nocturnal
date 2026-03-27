@@ -1,8 +1,18 @@
+use std::time::Duration;
+
 use anyhow::{Context, Result, bail};
 use tracing::{error, info};
 
 use crate::config::ProjectContext;
 use crate::{claude, git, lock, prompt, td, vcs};
+
+/// How long to wait after creating a PR/MR before enabling auto-merge.
+///
+/// CI pipelines need a moment to register on the newly-created proposal before
+/// the platform will accept an auto-merge request. Without this delay the call
+/// succeeds but auto-merge silently has no effect because no required checks
+/// have been attached yet.
+const AUTO_MERGE_DELAY: Duration = Duration::from_secs(5);
 
 pub fn run(ctx: &ProjectContext) -> Result<()> {
     let slug = ctx.project_slug();
@@ -185,7 +195,9 @@ pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
 
     // Enable auto-merge (best-effort)
     if ctx.auto_merge {
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        // Wait for CI pipelines to register on the new proposal before
+        // requesting auto-merge. See AUTO_MERGE_DELAY for full rationale.
+        std::thread::sleep(AUTO_MERGE_DELAY);
         if vcs::enable_auto_merge(platform, &wt_path, &proposal.id) {
             info!("Auto-merge enabled for #{}", proposal.id);
         } else {
