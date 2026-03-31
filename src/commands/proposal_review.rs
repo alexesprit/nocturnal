@@ -118,13 +118,24 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
                 "   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { isResolved } } }'\n",
                 "   ```\n",
             ),
-            vcs::Platform::GitLab => "",
+            vcs::Platform::GitLab => concat!(
+                "   **Discussion thread comment** (`thread_id` is not null):\n",
+                "   ```bash\n",
+                "   # Reply within the discussion thread (replace DISCUSSION_ID with the comment's `thread_id`)\n",
+                "   glab api --method POST \"projects/:fullpath/merge_requests/PROPOSAL_NUMBER/discussions/DISCUSSION_ID/notes\" -f \"body=Addressed: <brief summary>\"\n",
+                "\n",
+                "   # Resolve the discussion thread\n",
+                "   glab api --method PUT \"projects/:fullpath/merge_requests/PROPOSAL_NUMBER/discussions/DISCUSSION_ID\" -f \"resolved=true\"\n",
+                "   ```\n",
+            ),
         };
         let vcs_resolve_rule = match platform {
             vcs::Platform::GitHub => {
                 "- Resolve inline review threads after addressing them (as described in step 3); do NOT dismiss threads without addressing them"
             }
-            vcs::Platform::GitLab => "",
+            vcs::Platform::GitLab => {
+                "- Resolve discussion threads after addressing them (as described in step 3); do NOT resolve threads without addressing them"
+            }
         };
         let mut rendered = prompt::render_with_vcs(
             prompt::Template::ProposalReview,

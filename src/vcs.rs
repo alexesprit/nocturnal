@@ -240,6 +240,7 @@ pub fn fetch_unresolved_comments(
                 .unwrap_or(EMPTY)
                 .iter()
                 .flat_map(|d| {
+                    let discussion_id = d["id"].clone();
                     d["notes"]
                         .as_array()
                         .map(Vec::as_slice)
@@ -249,6 +250,7 @@ pub fn fetch_unresolved_comments(
                         .map(|n| {
                             serde_json::json!({
                                 "id": n["id"],
+                                "thread_id": discussion_id,
                                 "author": n["author"]["username"],
                                 "body": n["body"],
                                 "path": n["position"]["new_path"],
