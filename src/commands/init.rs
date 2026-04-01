@@ -24,7 +24,7 @@ const CORE_TOOLS: &[ToolCheck] = &[
     },
     ToolCheck {
         name: "git-gtr",
-        required: false,
+        required: true,
     },
 ];
 
