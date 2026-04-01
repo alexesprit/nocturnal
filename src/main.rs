@@ -36,6 +36,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Bootstrap a project directory for use with nocturnal
+    Init,
     /// Implement and review the next open task [default]
     Develop,
     /// Pick and implement the highest-priority open task
@@ -85,16 +87,18 @@ fn run(cli: Cli) -> Result<()> {
     cfg.dry_run = cli.dry_run;
     let command = cli.command.unwrap_or(Command::Develop);
 
+    let project_root = match cli.project {
+        Some(p) => std::path::PathBuf::from(p),
+        None => std::env::current_dir()?,
+    };
+
     match command {
+        Command::Init => commands::init::run(&project_root, cfg.dry_run),
         Command::DevelopRotate => commands::rotate::run(&cfg),
         Command::ProposalRotate => commands::proposal_review_rotate::run(&cfg),
         Command::Foreach => commands::foreach::run(&cfg),
         Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
         _ => {
-            let project_root = match cli.project {
-                Some(p) => std::path::PathBuf::from(p),
-                None => std::env::current_dir()?,
-            };
             config::check_td_init(&project_root)?;
 
             let ctx = config::ProjectContext::new(cfg, project_root);
@@ -104,7 +108,8 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Review => commands::review::run(&ctx),
                 Command::Proposal => commands::proposal_review::run(&ctx),
                 Command::Gc => commands::gc::run(&ctx),
-                Command::DevelopRotate
+                Command::Init
+                | Command::DevelopRotate
                 | Command::ProposalRotate
                 | Command::Foreach
                 | Command::Web { .. } => unreachable!(),

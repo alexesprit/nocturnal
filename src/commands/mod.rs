@@ -1,6 +1,7 @@
 pub mod foreach;
 pub mod gc;
 pub mod implement;
+pub mod init;
 pub mod proposal_review;
 pub mod proposal_review_rotate;
 pub mod review;
