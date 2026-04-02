@@ -135,10 +135,47 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
                     }
                     Err(e) => {
                         error!("Local merge failed for {task_id}: {e:#}");
-                        td_client
-                            .comment(task_id, &format!("Orchestrator: local merge failed: {e:#}"))
-                            .ok();
-                        td_client.block(task_id).ok();
+                        let task = td_client.show(task_id)?;
+                        let new_count = bump_review_count(&td_client, &task, task_id)?;
+
+                        if new_count >= ctx.max_reviews {
+                            td_client
+                                .comment(
+                                    task_id,
+                                    &format!(
+                                        "Orchestrator: local merge failed ({new_count}/{} attempts). \
+                                         Needs human attention.\n\nError: {e:#}",
+                                        ctx.max_reviews
+                                    ),
+                                )
+                                .ok();
+                            td_client.block(task_id)?;
+                            info!(
+                                "Task blocked after {new_count} merge failures — needs human attention"
+                            );
+                        } else {
+                            td_client
+                                .comment(
+                                    task_id,
+                                    &format!(
+                                        "Orchestrator: local merge failed ({new_count}/{} attempts). \
+                                         Rebase your changes onto `{}` and resolve conflicts.\n\nError: {e:#}",
+                                        ctx.max_reviews, ctx.target_branch
+                                    ),
+                                )
+                                .ok();
+                            td_client.reject(
+                                task_id,
+                                &format!(
+                                    "Merge conflict — rebase onto {} needed",
+                                    ctx.target_branch
+                                ),
+                            )?;
+                            info!(
+                                "Task reopened for rebase (attempt {new_count}/{})",
+                                ctx.max_reviews
+                            );
+                        }
                     }
                 }
             }
@@ -156,9 +193,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
             }
         }
     } else if task.status == "open" {
-        let new_count = td::get_review_count(&task) + 1;
-        let labels = td::build_labels_with_review_count(&task, new_count);
-        td_client.update_labels(task_id, &labels)?;
+        let new_count = bump_review_count(&td_client, &task, task_id)?;
         info!(
             "Task rejected (review cycle {new_count}/{})",
             ctx.max_reviews
@@ -185,4 +220,12 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     }
 
     Ok(true)
+}
+
+/// Increment the `noc-reviews` label counter and persist it. Returns the new count.
+fn bump_review_count(td_client: &td::Td, task: &td::Task, task_id: &str) -> Result<u32> {
+    let new_count = td::get_review_count(task) + 1;
+    let labels = td::build_labels_with_review_count(task, new_count);
+    td_client.update_labels(task_id, &labels)?;
+    Ok(new_count)
 }
