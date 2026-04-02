@@ -54,6 +54,9 @@ pub fn run(project_root: &Path, dry_run: bool) -> Result<()> {
     println!("  - Edit .nocturnal.toml to configure VCS mode, model, and other options");
     println!("  - Add tasks with: td add \"Task description\"");
     println!("  - Run: nocturnal implement");
+    println!(
+        "  - Extend prompts by creating files in .nocturnal/ (e.g. prompt-extra.md, prompt-implement.md)"
+    );
 
     Ok(())
 }
@@ -245,33 +248,6 @@ fn create_prompt_extras_dir(project_root: &Path, dry_run: bool) -> Result<()> {
         println!(".nocturnal/: already exists, skipping");
     }
 
-    let placeholders = [
-        (
-            "prompt-extra.md",
-            "<!-- Appended to ALL nocturnal prompt templates. Add project-specific context here. -->\n",
-        ),
-        (
-            "prompt-implement.md",
-            "<!-- Appended to the implement prompt template only. -->\n",
-        ),
-        (
-            "prompt-review.md",
-            "<!-- Appended to the review prompt template only. -->\n",
-        ),
-    ];
-
-    for (name, content) in &placeholders {
-        let file_path = dir.join(name);
-        if file_path.exists() {
-            println!(".nocturnal/{name}: already exists, skipping");
-        } else if dry_run {
-            println!(".nocturnal/{name}: would create (dry-run)");
-        } else {
-            fs::write(&file_path, content)?;
-            println!(".nocturnal/{name}: created");
-        }
-    }
-
     Ok(())
 }
 
@@ -343,9 +319,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         create_prompt_extras_dir(dir.path(), false).unwrap();
         assert!(dir.path().join(".nocturnal").is_dir());
-        assert!(dir.path().join(".nocturnal/prompt-extra.md").exists());
-        assert!(dir.path().join(".nocturnal/prompt-implement.md").exists());
-        assert!(dir.path().join(".nocturnal/prompt-review.md").exists());
     }
 
     #[test]
@@ -353,8 +326,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         create_prompt_extras_dir(dir.path(), false).unwrap();
         create_prompt_extras_dir(dir.path(), false).unwrap();
-        // No error, files still exist
-        assert!(dir.path().join(".nocturnal/prompt-extra.md").exists());
+        assert!(dir.path().join(".nocturnal").is_dir());
     }
 
     #[test]
@@ -362,17 +334,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         create_prompt_extras_dir(dir.path(), true).unwrap();
         assert!(!dir.path().join(".nocturnal").exists());
-    }
-
-    #[test]
-    fn create_prompt_extras_preserves_existing_files() {
-        let dir = TempDir::new().unwrap();
-        fs::create_dir(dir.path().join(".nocturnal")).unwrap();
-        let extra = dir.path().join(".nocturnal/prompt-extra.md");
-        fs::write(&extra, "custom content\n").unwrap();
-        create_prompt_extras_dir(dir.path(), false).unwrap();
-        let content = fs::read_to_string(&extra).unwrap();
-        assert_eq!(content, "custom content\n");
     }
 
     #[test]
