@@ -76,24 +76,28 @@ fn fetch_branch(project_root: &Path, branch: &str) {
     }
 }
 
-pub fn ensure_worktree(project_root: &Path, task_id: &str, base_branch: &str) -> Result<PathBuf> {
+pub fn ensure_worktree(
+    project_root: &Path,
+    task_id: &str,
+    base_branch: &str,
+    local_only: bool,
+) -> Result<PathBuf> {
     if let Some(path) = worktree_path(project_root, task_id)? {
         return Ok(path);
     }
 
-    fetch_branch(project_root, base_branch);
+    let from_ref = if local_only {
+        base_branch.to_string()
+    } else {
+        fetch_branch(project_root, base_branch);
+        format!("origin/{base_branch}")
+    };
 
     let branch = worktree_branch(task_id);
     tracing::info!("Creating worktree: {branch}");
 
     let status = Command::new("git")
-        .args([
-            "gtr",
-            "new",
-            &branch,
-            "--from",
-            &format!("origin/{base_branch}"),
-        ])
+        .args(["gtr", "new", &branch, "--from", &from_ref])
         .current_dir(project_root)
         .status()
         .context("Failed to run git gtr new")?;

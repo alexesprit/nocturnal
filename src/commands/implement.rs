@@ -45,7 +45,8 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         return Ok(false);
     }
 
-    let wt_path = git::ensure_worktree(&ctx.project_root, task_id, &ctx.base_branch)?;
+    let local_only = ctx.vcs_mode == crate::project_config::VcsMode::Local;
+    let wt_path = git::ensure_worktree(&ctx.project_root, task_id, &ctx.base_branch, local_only)?;
     info!("Worktree: {}", wt_path.display());
 
     // best-effort: task may already be in_progress from a previous attempt
