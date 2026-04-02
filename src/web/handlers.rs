@@ -212,7 +212,7 @@ fn fetch_project_status(
 ) -> ProjectStatus {
     let path_str = path.to_string_lossy();
     let td = Td::new(path);
-    let tasks = match td.list_all() {
+    let tasks = match td.list(&ListOpts::default()) {
         Ok(tasks) => tasks,
         Err(e) => {
             warn!("td list failed for {name}: {e}");

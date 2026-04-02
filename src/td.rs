@@ -219,13 +219,6 @@ impl<'a> Td<'a> {
         serde_json::from_str(&json).context("Failed to parse issue detail JSON")
     }
 
-    pub fn list_all(&self) -> Result<Vec<Task>> {
-        let json = self.run(&["list", "--json", "--all"])?;
-        let tasks: Vec<Task> =
-            serde_json::from_str::<Option<Vec<Task>>>(&json)?.unwrap_or_default();
-        Ok(tasks)
-    }
-
     pub fn list(&self, opts: &ListOpts) -> Result<Vec<Task>> {
         let mut args = vec!["list", "--json"];
 
