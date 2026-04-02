@@ -42,9 +42,22 @@ pub fn run(cfg: &Config, addr: &str, port: u16) -> Result<()> {
 
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
-        let app = web::router(state);
         let bind_addr = format!("{addr}:{port}");
-        let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
+
+        if tokio::net::TcpStream::connect(&bind_addr).await.is_ok() {
+            anyhow::bail!("port {port} is already in use (address {bind_addr})");
+        }
+
+        let app = web::router(state);
+        let listener = tokio::net::TcpListener::bind(&bind_addr)
+            .await
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
+                    anyhow::anyhow!("port {port} is already in use (address {bind_addr})")
+                } else {
+                    anyhow::anyhow!("failed to bind to {bind_addr}: {e}")
+                }
+            })?;
         info!("listening on http://{bind_addr}");
 
         axum::serve(listener, app)
