@@ -32,15 +32,12 @@ pub fn run(cfg: &Config) -> Result<()> {
         let slug = config::project_slug(&project_root);
         let lock_name = format!("run-{slug}");
 
-        let _lock = match lock::Lock::try_acquire(&cfg.lock_dir, &lock_name) {
-            Some(l) => l,
-            None => {
-                info!(
-                    "Skipping {} — locked (another process running)",
-                    project_root.display()
-                );
-                continue;
-            }
+        let Some(_lock) = lock::Lock::try_acquire(&cfg.lock_dir, &lock_name) else {
+            info!(
+                "Skipping {} — locked (another process running)",
+                project_root.display()
+            );
+            continue;
         };
 
         let ctx = ProjectContext::new(cfg.clone(), project_root.clone());

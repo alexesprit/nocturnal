@@ -4,14 +4,21 @@ const IMPLEMENT: &str = include_str!("../prompts/implement.md");
 const REVIEW: &str = include_str!("../prompts/review.md");
 const PROPOSAL_REVIEW: &str = include_str!("../prompts/proposal-review.md");
 
+#[derive(Clone, Copy)]
 pub enum Template {
     Implement,
     Review,
     ProposalReview,
 }
 
+pub struct VcsPrompt<'a> {
+    pub reply_cmd: &'a str,
+    pub inline_reply_instructions: &'a str,
+    pub resolve_rule: &'a str,
+}
+
 impl Template {
-    fn content(&self) -> &'static str {
+    fn content(self) -> &'static str {
         match self {
             Template::Implement => IMPLEMENT,
             Template::Review => REVIEW,
@@ -19,7 +26,7 @@ impl Template {
         }
     }
 
-    fn extra_filename(&self) -> &'static str {
+    fn extra_filename(self) -> &'static str {
         match self {
             Template::Implement => "prompt-implement.md",
             Template::Review => "prompt-review.md",
@@ -28,7 +35,7 @@ impl Template {
     }
 }
 
-fn append_extra(prompt: &mut String, project_root: &Path, template: &Template) {
+fn append_extra(prompt: &mut String, project_root: &Path, template: Template) {
     let dir = project_root.join(".nocturnal");
     if let Ok(shared) = std::fs::read_to_string(dir.join("prompt-extra.md")) {
         prompt.push('\n');
@@ -60,18 +67,16 @@ pub fn render_with_vcs(
     task_id: &str,
     project_root: &Path,
     max_reviews: u32,
-    vcs_reply_cmd: &str,
-    vcs_inline_reply_instructions: &str,
-    vcs_resolve_rule: &str,
+    vcs_prompt: &VcsPrompt<'_>,
     base_branch: &str,
 ) -> String {
     render_base(template, task_id, project_root, max_reviews, base_branch)
-        .replace("{{VCS_REPLY_CMD}}", vcs_reply_cmd)
+        .replace("{{VCS_REPLY_CMD}}", vcs_prompt.reply_cmd)
         .replace(
             "{{VCS_INLINE_REPLY_INSTRUCTIONS}}",
-            vcs_inline_reply_instructions,
+            vcs_prompt.inline_reply_instructions,
         )
-        .replace("{{VCS_RESOLVE_RULE}}", vcs_resolve_rule)
+        .replace("{{VCS_RESOLVE_RULE}}", vcs_prompt.resolve_rule)
 }
 
 pub fn render_base(
@@ -88,7 +93,7 @@ pub fn render_base(
         .replace("{{PROJECT_ROOT}}", project_root_str)
         .replace("{{MAX_REVIEWS}}", &max_reviews.to_string())
         .replace("{{BASE_BRANCH}}", base_branch);
-    append_extra(&mut result, project_root, &template);
+    append_extra(&mut result, project_root, template);
     result
 }
 
@@ -98,7 +103,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    fn setup_nocturnal_dir(base: &PathBuf) -> PathBuf {
+    fn setup_nocturnal_dir(base: &Path) -> PathBuf {
         let dir = base.join(".nocturnal");
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -119,7 +124,7 @@ mod tests {
         assert!(!result.contains("{{BASE_BRANCH}}"));
         assert!(result.contains("task-42"));
         assert!(result.contains("/home/project"));
-        assert!(result.contains("5"));
+        assert!(result.contains('5'));
     }
 
     #[test]
@@ -133,7 +138,7 @@ mod tests {
             "main",
         );
         assert!(!result.contains("{{REVIEW_CYCLE}}"));
-        assert!(result.contains("2"));
+        assert!(result.contains('2'));
     }
 
     #[test]
@@ -156,9 +161,11 @@ mod tests {
             "task-1",
             Path::new("/root"),
             3,
-            "glab mr note 42",
-            "",
-            "",
+            &VcsPrompt {
+                reply_cmd: "glab mr note 42",
+                inline_reply_instructions: "",
+                resolve_rule: "",
+            },
             "main",
         );
         assert!(!result.contains("{{VCS_REPLY_CMD}}"));
@@ -173,7 +180,7 @@ mod tests {
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-extra.md"), "shared content").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, &tmp, &Template::Implement);
+        append_extra(&mut prompt, &tmp, Template::Implement);
         assert!(prompt.contains("base"));
         assert!(prompt.contains("shared content"));
     }
@@ -184,7 +191,7 @@ mod tests {
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-implement.md"), "impl extra").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, &tmp, &Template::Implement);
+        append_extra(&mut prompt, &tmp, Template::Implement);
         assert!(prompt.contains("impl extra"));
     }
 
@@ -195,7 +202,7 @@ mod tests {
         fs::write(dir.join("prompt-extra.md"), "shared").unwrap();
         fs::write(dir.join("prompt-review.md"), "review extra").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, &tmp, &Template::Review);
+        append_extra(&mut prompt, &tmp, Template::Review);
         let shared_pos = prompt.find("shared").unwrap();
         let specific_pos = prompt.find("review extra").unwrap();
         assert!(
@@ -208,7 +215,7 @@ mod tests {
     fn append_extra_no_files_no_change() {
         let tmp = tempdir();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, &tmp, &Template::Implement);
+        append_extra(&mut prompt, &tmp, Template::Implement);
         assert_eq!(prompt, "base");
     }
 
@@ -218,7 +225,7 @@ mod tests {
         let dir = setup_nocturnal_dir(&tmp);
         fs::write(dir.join("prompt-review.md"), "review extra").unwrap();
         let mut prompt = String::from("base");
-        append_extra(&mut prompt, &tmp, &Template::Implement);
+        append_extra(&mut prompt, &tmp, Template::Implement);
         assert!(!prompt.contains("review extra"));
     }
 

@@ -33,7 +33,7 @@ pub fn run(project_root: &Path, dry_run: bool) -> Result<()> {
     println!();
 
     // 1. Check required tools
-    let all_ok = check_tools(project_root)?;
+    let all_ok = check_tools(project_root);
     println!();
     if !all_ok {
         anyhow::bail!("One or more required tools are missing. Install them and re-run.");
@@ -69,7 +69,7 @@ fn tool_on_path(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn check_tools(project_root: &Path) -> Result<bool> {
+fn check_tools(project_root: &Path) -> bool {
     println!("Checking required tools:");
 
     // Detect which VCS tools to check based on git remote
@@ -104,7 +104,7 @@ fn check_tools(project_root: &Path) -> Result<bool> {
     if need_gh {
         let found = tool_on_path("gh");
         let status = if found { "found" } else { "MISSING" };
-        println!("  gh: {} (required for GitHub VCS mode)", status);
+        println!("  gh: {status} (required for GitHub VCS mode)");
         if !found {
             all_required_ok = false;
         }
@@ -113,13 +113,13 @@ fn check_tools(project_root: &Path) -> Result<bool> {
     if need_glab {
         let found = tool_on_path("glab");
         let status = if found { "found" } else { "MISSING" };
-        println!("  glab: {} (required for GitLab VCS mode)", status);
+        println!("  glab: {status} (required for GitLab VCS mode)");
         if !found {
             all_required_ok = false;
         }
     }
 
-    Ok(all_required_ok)
+    all_required_ok
 }
 
 fn init_td(project_root: &Path, dry_run: bool) -> Result<()> {
@@ -237,15 +237,13 @@ base_branch = "{base_branch}"
 fn create_prompt_extras_dir(project_root: &Path, dry_run: bool) -> Result<()> {
     let dir = project_root.join(".nocturnal");
 
-    if !dir.exists() {
-        if dry_run {
-            println!(".nocturnal/: would create directory (dry-run)");
-        } else {
-            fs::create_dir_all(&dir)?;
-            println!(".nocturnal/: created directory");
-        }
-    } else {
+    if dir.exists() {
         println!(".nocturnal/: already exists, skipping");
+    } else if dry_run {
+        println!(".nocturnal/: would create directory (dry-run)");
+    } else {
+        fs::create_dir_all(&dir)?;
+        println!(".nocturnal/: created directory");
     }
 
     Ok(())

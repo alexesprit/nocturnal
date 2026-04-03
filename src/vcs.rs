@@ -6,6 +6,8 @@ use anyhow::{Context, Result, bail};
 use crate::project_config::{MergeStrategy, VcsMode};
 use crate::util::retry;
 
+const EMPTY_JSON_VALUES: &[serde_json::Value] = &[];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Platform {
     GitHub,
@@ -216,6 +218,7 @@ pub fn get_proposal_state(
     })
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn fetch_unresolved_comments(
     platform: Platform,
     wt_path: &Path,
@@ -232,19 +235,16 @@ pub fn fetch_unresolved_comments(
                 .output()
                 .context("Failed to fetch GitLab discussions")?;
 
-            const EMPTY: &[serde_json::Value] = &[];
             let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
             let comments: Vec<serde_json::Value> = json
                 .as_array()
-                .map(Vec::as_slice)
-                .unwrap_or(EMPTY)
+                .map_or(EMPTY_JSON_VALUES, Vec::as_slice)
                 .iter()
                 .flat_map(|d| {
                     let discussion_id = d["id"].clone();
                     d["notes"]
                         .as_array()
-                        .map(Vec::as_slice)
-                        .unwrap_or(EMPTY)
+                        .map_or(EMPTY_JSON_VALUES, Vec::as_slice)
                         .iter()
                         .filter(|n| n["resolved"] == false)
                         .map(|n| {
@@ -265,7 +265,7 @@ pub fn fetch_unresolved_comments(
         Platform::GitHub => {
             let (owner, repo) = gh_owner_repo(wt_path)?;
 
-            let query = r#"query($owner: String!, $repo: String!, $pr: Int!) {
+            let query = r"query($owner: String!, $repo: String!, $pr: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $pr) {
       reviewThreads(first: 100) {
@@ -285,7 +285,7 @@ pub fn fetch_unresolved_comments(
       }
     }
   }
-}"#;
+}";
 
             let output = Command::new("gh")
                 .args([
@@ -467,7 +467,7 @@ fn extract_trailing_number(s: &str) -> Result<String> {
     let id: String = s
         .chars()
         .rev()
-        .take_while(|c| c.is_ascii_digit())
+        .take_while(char::is_ascii_digit)
         .collect::<String>()
         .chars()
         .rev()

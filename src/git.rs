@@ -15,6 +15,7 @@ pub fn worktree_branch(task_id: &str) -> String {
     format!("{WORKTREE_PREFIX}/{task_id}")
 }
 
+#[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -68,10 +69,12 @@ fn fetch_branch(project_root: &Path, branch: &str) {
     match status {
         Ok(s) if s.success() => {}
         Ok(s) => {
-            tracing::warn!("git fetch origin {branch} exited with {s}; continuing with local state")
+            tracing::warn!(
+                "git fetch origin {branch} exited with {s}; continuing with local state"
+            );
         }
         Err(e) => {
-            tracing::warn!("git fetch origin {branch} failed: {e}; continuing with local state")
+            tracing::warn!("git fetch origin {branch} failed: {e}; continuing with local state");
         }
     }
 }
@@ -123,9 +126,7 @@ pub fn is_ancestor(project_root: &Path, potential_ancestor: &str, branch: &str) 
 /// Fast-forward merge: atomically update `target_branch` ref to `source_branch` without checkout.
 /// If `target_branch` is currently checked out, also updates the working tree.
 pub fn merge_ff_only(project_root: &Path, target_branch: &str, source_branch: &str) -> Result<()> {
-    let checked_out = current_branch(project_root)
-        .map(|b| b == target_branch)
-        .unwrap_or(false);
+    let checked_out = current_branch(project_root).is_some_and(|b| b == target_branch);
 
     if checked_out {
         // Target is checked out — use git merge --ff-only to keep working tree in sync
@@ -182,6 +183,26 @@ fn current_branch(project_root: &Path) -> Option<String> {
     }
 }
 
+struct BranchGuard<'a> {
+    project_root: &'a Path,
+    original_branch: String,
+    armed: bool,
+}
+
+impl Drop for BranchGuard<'_> {
+    fn drop(&mut self) {
+        if self.armed {
+            Command::new("git")
+                .args(["checkout", &self.original_branch])
+                .current_dir(self.project_root)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .ok();
+        }
+    }
+}
+
 /// Merge with a merge commit. Requires a clean working tree in the project root.
 /// Uses a Drop guard to restore the original branch on error/panic.
 pub fn merge_no_ff(project_root: &Path, target_branch: &str, source_branch: &str) -> Result<()> {
@@ -202,26 +223,6 @@ pub fn merge_no_ff(project_root: &Path, target_branch: &str, source_branch: &str
     // Record original branch (bail on detached HEAD)
     let original_branch = current_branch(project_root)
         .ok_or_else(|| anyhow::anyhow!("Cannot perform no-ff merge from detached HEAD state"))?;
-
-    // Drop guard to restore original branch on error/panic
-    struct BranchGuard<'a> {
-        project_root: &'a Path,
-        original_branch: String,
-        armed: bool,
-    }
-    impl Drop for BranchGuard<'_> {
-        fn drop(&mut self) {
-            if self.armed {
-                Command::new("git")
-                    .args(["checkout", &self.original_branch])
-                    .current_dir(self.project_root)
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .status()
-                    .ok();
-            }
-        }
-    }
 
     let mut guard = BranchGuard {
         project_root,

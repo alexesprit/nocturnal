@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 
@@ -33,6 +34,7 @@ const ALLOWED_SORTS: &[&str] = &[
     "priority", "created", "modified", "status", "title", "updated",
 ];
 const ALLOWED_VIEWS: &[&str] = &["table", "kanban"];
+const MAX_QUERY_LEN: usize = 200;
 
 fn sanitize_param(value: &str, allowed: &[&str]) -> Option<String> {
     if allowed.contains(&value) {
@@ -121,10 +123,12 @@ struct IssueTableErrorTemplate {
 mod filters {
     pub use crate::web::filters::{format_date, format_datetime};
 
+    #[allow(clippy::unnecessary_wraps)]
     pub fn render_markdown(s: &str, _values: &dyn askama::Values) -> askama::Result<String> {
         Ok(crate::web::markdown::render(s))
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     pub fn join_labels(
         labels: &[String],
         _values: &dyn askama::Values,
@@ -300,19 +304,17 @@ fn check_lock_status(lock_dir: &FsPath, slug: &str) -> LockStatus {
         format!("nocturnal.run-{slug}.lock"),
         format!("nocturnal.proposal-{slug}.lock"),
     ];
-    let lock_path = match lock_names
+    let Some(lock_path) = lock_names
         .iter()
         .map(|n| lock_dir.join(n))
         .find(|p| p.is_dir())
-    {
-        Some(p) => p,
-        None => return LockStatus::Idle,
+    else {
+        return LockStatus::Idle;
     };
 
     let pid_file = lock_path.join("pid");
-    let pid_str = match std::fs::read_to_string(&pid_file) {
-        Ok(s) => s,
-        Err(_) => return LockStatus::Stale,
+    let Ok(pid_str) = std::fs::read_to_string(&pid_file) else {
+        return LockStatus::Stale;
     };
 
     let pid: u32 = match pid_str.trim().parse() {
@@ -402,9 +404,10 @@ fn read_rotation_state(
 }
 
 fn format_iso_datetime(s: &str) -> String {
-    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
-        .map(|dt| dt.format("%b %-d, %Y %H:%M").to_string())
-        .unwrap_or_else(|_| s.to_string())
+    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").map_or_else(
+        |_| s.to_string(),
+        |dt| dt.format("%b %-d, %Y %H:%M").to_string(),
+    )
 }
 
 fn format_duration_secs(secs: u64) -> String {
@@ -516,10 +519,12 @@ fn derive_noc_state(
     // Build proposal URL if a proposal label exists
     let (proposal_url, proposal_label) = labels
         .iter()
-        .find_map(|l| l.strip_prefix("noc-proposal:").map(|id| id.to_string()))
+        .find_map(|l| {
+            l.strip_prefix("noc-proposal:")
+                .map(std::string::ToString::to_string)
+        })
         .and_then(|id| build_proposal_url(project_path, &id))
-        .map(|(url, label)| (Some(url), Some(label)))
-        .unwrap_or((None, None));
+        .map_or((None, None), |(url, label)| (Some(url), Some(label)));
 
     Some(NocIssueState {
         badge,
@@ -550,9 +555,8 @@ pub async fn project(
     Path(name): Path<String>,
     Query(params): Query<IssueFilterParams>,
 ) -> Response {
-    let entry = match state.find_project(&name) {
-        Some(e) => e,
-        None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
+    let Some(entry) = state.find_project(&name) else {
+        return (StatusCode::NOT_FOUND, "project not found").into_response();
     };
 
     let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
@@ -583,7 +587,7 @@ pub async fn project(
 
     match active_result {
         Ok(Ok(issues)) => {
-            let recently_closed = closed_result.ok().and_then(|r| r.ok()).unwrap_or_default();
+            let recently_closed = closed_result.ok().and_then(Result::ok).unwrap_or_default();
 
             let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
                 let (o, ip, bl, ir) = group_by_status(issues);
@@ -627,129 +631,139 @@ pub async fn project(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn project_issues(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     headers: HeaderMap,
     Query(params): Query<IssueFilterParams>,
 ) -> Response {
-    let entry = match state.find_project(&name) {
-        Some(e) => e,
-        None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
-    };
+    async fn inner(
+        state: Arc<AppState>,
+        name: String,
+        headers: HeaderMap,
+        params: IssueFilterParams,
+    ) -> Response {
+        let Some(entry) = state.find_project(&name) else {
+            return (StatusCode::NOT_FOUND, "project not found").into_response();
+        };
 
-    let is_htmx = headers.get("HX-Request").is_some();
+        let is_htmx = headers.get("HX-Request").is_some();
 
-    let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
+        let view =
+            sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
 
-    const MAX_QUERY_LEN: usize = 200;
-    let query = if params.q.is_empty()
-        || params.q.starts_with('-')
-        || params.q.len() > MAX_QUERY_LEN
-        || !params.q.chars().all(|c| c.is_ascii_graphic() || c == ' ')
-    {
-        None
-    } else {
-        Some(params.q)
-    };
+        let query = if params.q.is_empty()
+            || params.q.starts_with('-')
+            || params.q.len() > MAX_QUERY_LEN
+            || !params.q.chars().all(|c| c.is_ascii_graphic() || c == ' ')
+        {
+            None
+        } else {
+            Some(params.q)
+        };
 
-    let opts = ListOpts {
-        status: sanitize_param(&params.status, ALLOWED_STATUSES),
-        priority: sanitize_param(&params.priority, ALLOWED_PRIORITIES),
-        task_type: sanitize_param(&params.issue_type, ALLOWED_TYPES),
-        query,
-        sort: sanitize_param(&params.sort, ALLOWED_SORTS).or(Some("priority".to_string())),
-        all: false,
-        ..Default::default()
-    };
+        let opts = ListOpts {
+            status: sanitize_param(&params.status, ALLOWED_STATUSES),
+            priority: sanitize_param(&params.priority, ALLOWED_PRIORITIES),
+            task_type: sanitize_param(&params.issue_type, ALLOWED_TYPES),
+            query,
+            sort: sanitize_param(&params.sort, ALLOWED_SORTS).or(Some("priority".to_string())),
+            all: false,
+            ..Default::default()
+        };
 
-    let path = entry.path.clone();
-    let path2 = entry.path.clone();
-    let project_name = name.clone();
+        let path = entry.path.clone();
+        let path2 = entry.path.clone();
+        let project_name = name.clone();
 
-    let result = tokio::task::spawn_blocking(move || Td::new(&path).list(&opts)).await;
+        let result = tokio::task::spawn_blocking(move || Td::new(&path).list(&opts)).await;
 
-    match result {
-        Ok(Ok(issues)) => {
-            if is_htmx {
-                if view == "kanban" {
-                    let (open, in_progress, blocked, in_review) = group_by_status(issues);
-                    let tmpl = KanbanBoardTemplate {
+        match result {
+            Ok(Ok(issues)) => {
+                if is_htmx {
+                    if view == "kanban" {
+                        let (open, in_progress, blocked, in_review) = group_by_status(issues);
+                        let tmpl = KanbanBoardTemplate {
+                            name,
+                            open,
+                            in_progress,
+                            blocked,
+                            in_review,
+                        };
+                        into_html_response(tmpl)
+                    } else {
+                        let tmpl = TableWrapperTemplate { name, issues };
+                        into_html_response(tmpl)
+                    }
+                } else {
+                    let recently_closed = tokio::task::spawn_blocking(move || {
+                        Td::new(&path2).list(&ListOpts {
+                            status: Some("closed".to_string()),
+                            sort: Some("closed_at".to_string()),
+                            reverse: true,
+                            limit: Some(10),
+                            all: true,
+                            ..Default::default()
+                        })
+                    })
+                    .await
+                    .ok()
+                    .and_then(Result::ok)
+                    .unwrap_or_default();
+
+                    let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban"
+                    {
+                        let (o, ip, bl, ir) = group_by_status(issues);
+                        (Vec::new(), o, ip, bl, ir)
+                    } else {
+                        (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
+                    };
+                    let tmpl = ProjectTemplate {
+                        title: name.clone(),
+                        breadcrumbs: vec![Breadcrumb {
+                            label: name.clone(),
+                            url: None,
+                        }],
                         name,
+                        view,
+                        issues: table_issues,
                         open,
                         in_progress,
                         blocked,
                         in_review,
+                        recently_closed,
+                    };
+                    into_html_response(tmpl)
+                }
+            }
+            Ok(Err(e)) => {
+                warn!("td list failed for {project_name}: {e}");
+                if is_htmx {
+                    let tmpl = IssueTableErrorTemplate {
+                        error_msg: e.to_string(),
                     };
                     into_html_response(tmpl)
                 } else {
-                    let tmpl = TableWrapperTemplate { name, issues };
+                    let tmpl = ProjectErrorTemplate {
+                        title: project_name.clone(),
+                        breadcrumbs: vec![Breadcrumb {
+                            label: project_name.clone(),
+                            url: None,
+                        }],
+                        error_msg: e.to_string(),
+                    };
                     into_html_response(tmpl)
                 }
-            } else {
-                let recently_closed = tokio::task::spawn_blocking(move || {
-                    Td::new(&path2).list(&ListOpts {
-                        status: Some("closed".to_string()),
-                        sort: Some("closed_at".to_string()),
-                        reverse: true,
-                        limit: Some(10),
-                        all: true,
-                        ..Default::default()
-                    })
-                })
-                .await
-                .ok()
-                .and_then(|r| r.ok())
-                .unwrap_or_default();
-
-                let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
-                    let (o, ip, bl, ir) = group_by_status(issues);
-                    (Vec::new(), o, ip, bl, ir)
-                } else {
-                    (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
-                };
-                let tmpl = ProjectTemplate {
-                    title: name.clone(),
-                    breadcrumbs: vec![Breadcrumb {
-                        label: name.clone(),
-                        url: None,
-                    }],
-                    name,
-                    view,
-                    issues: table_issues,
-                    open,
-                    in_progress,
-                    blocked,
-                    in_review,
-                    recently_closed,
-                };
-                into_html_response(tmpl)
             }
-        }
-        Ok(Err(e)) => {
-            warn!("td list failed for {project_name}: {e}");
-            if is_htmx {
-                let tmpl = IssueTableErrorTemplate {
-                    error_msg: e.to_string(),
-                };
-                into_html_response(tmpl)
-            } else {
-                let tmpl = ProjectErrorTemplate {
-                    title: project_name.clone(),
-                    breadcrumbs: vec![Breadcrumb {
-                        label: project_name.clone(),
-                        url: None,
-                    }],
-                    error_msg: e.to_string(),
-                };
-                into_html_response(tmpl)
+            Err(e) => {
+                error!("task join error: {e}");
+                (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
             }
-        }
-        Err(e) => {
-            error!("task join error: {e}");
-            (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
         }
     }
+
+    inner(state, name, headers, params).await
 }
 
 pub async fn issue(
@@ -760,9 +774,8 @@ pub async fn issue(
         return (StatusCode::BAD_REQUEST, "invalid issue id").into_response();
     }
 
-    let entry = match state.find_project(&name) {
-        Some(e) => e,
-        None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
+    let Some(entry) = state.find_project(&name) else {
+        return (StatusCode::NOT_FOUND, "project not found").into_response();
     };
 
     let path = entry.path.clone();
@@ -894,9 +907,8 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
 }
 
 pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> Response {
-    let entry = match state.find_project(&name) {
-        Some(e) => e,
-        None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
+    let Some(entry) = state.find_project(&name) else {
+        return (StatusCode::NOT_FOUND, "project not found").into_response();
     };
 
     let slug = crate::config::project_slug(&entry.path);
@@ -962,14 +974,12 @@ pub async fn update_priority(
     }
 
     let valid_priorities = &ALLOWED_PRIORITIES[1..]; // exclude "all"
-    let priority = match sanitize_param(&form.priority, valid_priorities) {
-        Some(p) => p,
-        None => return (StatusCode::BAD_REQUEST, "invalid priority").into_response(),
+    let Some(priority) = sanitize_param(&form.priority, valid_priorities) else {
+        return (StatusCode::BAD_REQUEST, "invalid priority").into_response();
     };
 
-    let entry = match state.find_project(&name) {
-        Some(e) => e,
-        None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
+    let Some(entry) = state.find_project(&name) else {
+        return (StatusCode::NOT_FOUND, "project not found").into_response();
     };
 
     let path = entry.path.clone();
@@ -1022,7 +1032,7 @@ fn priority_select_html(project_name: &str, issue_id: &str, current_priority: &s
         } else {
             ""
         };
-        options.push_str(&format!(r#"<option value="{p}"{selected}>{p}</option>"#));
+        let _ = write!(options, r#"<option value="{p}"{selected}>{p}</option>"#);
     }
     format!(
         "<span class=\"priority-select-wrapper badge badge-priority badge-priority-{current_priority}\" id=\"priority-select-{issue_id}\"><select class=\"priority-select\" hx-post=\"/api/projects/{project_name}/issues/{issue_id}/priority\" hx-trigger=\"change\" hx-target=\"#priority-select-{issue_id}\" hx-swap=\"outerHTML\" name=\"priority\">{options}</select></span>"

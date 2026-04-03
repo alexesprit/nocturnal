@@ -15,12 +15,9 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
 fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
     let td_client = td::Td::new(&ctx.project_root);
 
-    let task_id = match td_client.get_reviewable_task_id()? {
-        Some(id) => id,
-        None => {
-            info!("No reviewable tasks found");
-            return Ok(());
-        }
+    let Some(task_id) = td_client.get_reviewable_task_id()? else {
+        info!("No reviewable tasks found");
+        return Ok(());
     };
 
     review_task(ctx, &task_id).map(|_| ())
@@ -28,6 +25,7 @@ fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
 
 /// Review a specific task. Returns Ok(true) if review completed successfully
 /// (approved, rejected, or proposal created).
+#[allow(clippy::too_many_lines)]
 pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     let td_client = td::Td::new(&ctx.project_root);
 

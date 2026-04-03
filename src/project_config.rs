@@ -218,7 +218,9 @@ fn validate_branch_name(name: &str) -> bool {
         && !name.contains("@{")
         && !name.starts_with('.')
         && !name.ends_with('.')
-        && !name.ends_with(".lock")
+        && !Path::new(name)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
         && !name.contains(|c: char| {
             c.is_whitespace()
                 || c.is_control()
@@ -365,7 +367,6 @@ mod tests {
     #[test]
     fn claude_section_model_fallback() {
         let toml = "[claude]\nmodel = \"opus\"";
-        let settings_toml = format!("{toml}");
         // Use a temp dir approach: write to a temp file and load
         // Instead, test the struct directly
         let f: ProjectConfig = toml::from_str(toml).unwrap();
@@ -379,7 +380,6 @@ mod tests {
             .implement_model
             .unwrap_or_else(|| default_model.to_string());
         assert_eq!(implement_model, "opus");
-        drop(settings_toml);
     }
 
     #[test]

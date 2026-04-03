@@ -49,5 +49,5 @@ impl Drop for Lock {
 }
 
 pub(crate) fn is_process_alive(pid: u32) -> bool {
-    unsafe { libc::kill(pid as i32, 0) == 0 }
+    i32::try_from(pid).is_ok_and(|pid| unsafe { libc::kill(pid, 0) == 0 })
 }

@@ -3,6 +3,7 @@ pub mod handlers;
 pub mod markdown;
 pub mod models;
 
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -53,9 +54,10 @@ pub fn router(state: Arc<AppState>) -> Router {
 async fn static_handler(
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> impl axum::response::IntoResponse {
-    let mime = if path.ends_with(".css") {
+    let extension = Path::new(&path).extension();
+    let mime = if extension.is_some_and(|ext| ext.eq_ignore_ascii_case("css")) {
         "text/css"
-    } else if path.ends_with(".js") {
+    } else if extension.is_some_and(|ext| ext.eq_ignore_ascii_case("js")) {
         "application/javascript"
     } else {
         "application/octet-stream"

@@ -15,10 +15,7 @@ const TERMINAL_STATUSES: &[&str] = &["done", "approved", "blocked", "closed"];
 pub fn run(ctx: &ProjectContext) -> Result<()> {
     let worktrees_removed = gc_worktrees(ctx)?;
     let locks_removed = gc_stale_locks(&ctx.cfg.lock_dir)?;
-    println!(
-        "gc: {} worktree(s) removed, {} stale lock(s) cleaned",
-        worktrees_removed, locks_removed
-    );
+    println!("gc: {worktrees_removed} worktree(s) removed, {locks_removed} stale lock(s) cleaned");
     Ok(())
 }
 
@@ -87,7 +84,11 @@ fn gc_stale_locks(lock_dir: &Path) -> Result<usize> {
         }
 
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if !name.starts_with("nocturnal.") || !name.ends_with(".lock") {
+        if !name.starts_with("nocturnal.")
+            || !Path::new(name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
+        {
             continue;
         }
 

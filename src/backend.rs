@@ -54,9 +54,10 @@ impl AiBackend for ClaudeBackend {
     ) -> Result<bool> {
         fs::create_dir_all(&self.log_dir).ok();
 
-        match self.max_budget {
-            Some(b) => info!("Running Claude (model={model}, budget=${b})..."),
-            None => info!("Running Claude (model={model}, budget=unlimited)..."),
+        if let Some(b) = self.max_budget {
+            info!("Running Claude (model={model}, budget=${b})...");
+        } else {
+            info!("Running Claude (model={model}, budget=unlimited)...");
         }
         info!("Log: {}", log_file.display());
 

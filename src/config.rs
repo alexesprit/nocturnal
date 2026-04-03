@@ -110,14 +110,17 @@ impl Config {
 
     pub fn projects_list(&self) -> Vec<String> {
         if let Ok(val) = env::var("NOCTURNAL_PROJECTS") {
-            return val.split(':').map(|s| s.to_string()).collect();
+            return val
+                .split(':')
+                .map(std::string::ToString::to_string)
+                .collect();
         }
         if let Ok(content) = fs::read_to_string(&self.projects_file) {
             return content
                 .lines()
-                .map(|l| l.trim())
+                .map(str::trim)
                 .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                .map(|l| l.to_string())
+                .map(std::string::ToString::to_string)
                 .collect();
         }
         Vec::new()

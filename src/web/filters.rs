@@ -1,5 +1,6 @@
 use chrono::DateTime;
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn format_date(s: &str, _values: &dyn askama::Values) -> askama::Result<String> {
     if s.is_empty() {
         return Ok(String::new());
@@ -10,6 +11,7 @@ pub fn format_date(s: &str, _values: &dyn askama::Values) -> askama::Result<Stri
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn format_datetime(s: &str, _values: &dyn askama::Values) -> askama::Result<String> {
     if s.is_empty() {
         return Ok(String::new());

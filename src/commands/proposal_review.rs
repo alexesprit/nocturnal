@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
@@ -23,6 +24,7 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
 }
 
 /// Returns Ok(true) if there were proposal tasks to process, Ok(false) if nothing to do.
+#[allow(clippy::too_many_lines)]
 pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
     let td_client = td::Td::new(&ctx.project_root);
 
@@ -142,14 +144,17 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             &task_id,
             &ctx.project_root,
             ctx.max_reviews,
-            &vcs_reply_cmd,
-            vcs_inline_reply_instructions,
-            vcs_resolve_rule,
+            &prompt::VcsPrompt {
+                reply_cmd: &vcs_reply_cmd,
+                inline_reply_instructions: vcs_inline_reply_instructions,
+                resolve_rule: vcs_resolve_rule,
+            },
             &ctx.base_branch,
         );
-        rendered.push_str(&format!(
+        let _ = write!(
+            rendered,
             "\n## Unresolved Comments\n\n```json\n{comments_json}\n```\n"
-        ));
+        );
 
         let slug = ctx.project_slug();
         let log_file = claude::log_path(&ctx.cfg.log_dir, "proposal", &task_id);

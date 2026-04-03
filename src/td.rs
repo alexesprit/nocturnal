@@ -12,7 +12,7 @@ pub(crate) fn validate_task_id(id: &str) -> Result<()> {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
     {
-        bail!("invalid task ID: {:?}", id);
+        bail!("invalid task ID: {id:?}");
     }
     Ok(())
 }
@@ -25,7 +25,7 @@ where
     Ok(Option::deserialize(deserializer)?.unwrap_or_default())
 }
 
-#[allow(dead_code)] // fields used by askama templates
+#[allow(dead_code, clippy::struct_field_names)] // fields used by askama templates
 #[derive(Debug, Deserialize)]
 pub struct Task {
     pub id: String,
@@ -206,11 +206,10 @@ impl<'a> Td<'a> {
         String::from_utf8(output.stdout).context("td output was not valid UTF-8")
     }
 
-    fn run_quiet(&self, args: &[&str]) -> Result<()> {
+    fn run_quiet(&self, args: &[&str]) {
         if let Err(e) = self.run(args) {
             debug!("td {} (ignored): {e:#}", args.join(" "));
         }
-        Ok(())
     }
 
     pub fn show(&self, task_id: &str) -> Result<Task> {
@@ -299,7 +298,7 @@ impl<'a> Td<'a> {
             .as_array()
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                     .collect()
             })
             .unwrap_or_default()
@@ -316,7 +315,7 @@ impl<'a> Td<'a> {
             .as_array()
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| v["id"].as_str().map(|s| s.to_string()))
+                    .filter_map(|v| v["id"].as_str().map(std::string::ToString::to_string))
                     .collect()
             })
             .unwrap_or_default()
@@ -347,11 +346,14 @@ impl<'a> Td<'a> {
             if stderr_trimmed.is_empty() {
                 return Ok(None);
             }
-            bail!("td next failed: {}", stderr_trimmed);
+            bail!("td next failed: {stderr_trimmed}");
         }
 
         let stdout = String::from_utf8(output.stdout).context("td output was not valid UTF-8")?;
-        let id = stdout.split_whitespace().next().map(|s| s.to_string());
+        let id = stdout
+            .split_whitespace()
+            .next()
+            .map(std::string::ToString::to_string);
         if let Some(ref task_id) = id {
             validate_task_id(task_id)?;
         }
@@ -446,7 +448,7 @@ impl<'a> Td<'a> {
         let out = stdout.trim();
         let out_lower = out.to_ascii_lowercase();
         if out_lower.starts_with("error:") || out_lower.starts_with("warning:") {
-            bail!("td approve {} failed: {}", task_id, out);
+            bail!("td approve {task_id} failed: {out}");
         }
         Ok(())
     }
@@ -460,12 +462,16 @@ impl<'a> Td<'a> {
         self.run(&["block", task_id]).map(|_| ())
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     pub fn comment(&self, task_id: &str, message: &str) -> Result<()> {
-        self.run_quiet(&["comment", task_id, message])
+        self.run_quiet(&["comment", task_id, message]);
+        Ok(())
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     pub fn log(&self, message: &str) -> Result<()> {
-        self.run_quiet(&["log", message])
+        self.run_quiet(&["log", message]);
+        Ok(())
     }
 
     pub fn update_labels(&self, task_id: &str, labels: &str) -> Result<()> {
@@ -489,7 +495,7 @@ pub enum NextAction {
 impl NextAction {
     pub fn task_id(&self) -> Option<&str> {
         match self {
-            NextAction::ProposalReview(ids) => ids.first().map(|s| s.as_str()),
+            NextAction::ProposalReview(ids) => ids.first().map(String::as_str),
             NextAction::Review(id) | NextAction::Implement(id) => Some(id),
             NextAction::Idle => None,
         }
@@ -581,7 +587,7 @@ mod tests {
             title: String::new(),
             description: String::new(),
             status: String::new(),
-            labels: labels.iter().map(|s| s.to_string()).collect(),
+            labels: labels.iter().map(|s| (*s).to_string()).collect(),
             priority: String::new(),
             task_type: String::new(),
             points: None,

@@ -56,17 +56,14 @@ pub fn rotate_projects(
         let slug = config::project_slug(&project_root);
         let lock_name = format!("{lock_prefix}-{slug}");
 
-        let _lock = match lock::Lock::try_acquire(&cfg.lock_dir, &lock_name) {
-            Some(l) => l,
-            None => {
-                info!(
-                    "Skipping {} — locked (another process running)",
-                    project_root.display()
-                );
-                idx = (idx + 1) % count;
-                tried += 1;
-                continue;
-            }
+        let Some(_lock) = lock::Lock::try_acquire(&cfg.lock_dir, &lock_name) else {
+            info!(
+                "Skipping {} — locked (another process running)",
+                project_root.display()
+            );
+            idx = (idx + 1) % count;
+            tried += 1;
+            continue;
         };
 
         let ctx = ProjectContext::new(cfg.clone(), project_root.clone());
