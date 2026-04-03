@@ -8,7 +8,7 @@ fmt:
     cargo fmt
 
 check:
-    cargo clippy
+    cargo clippy --all-targets --all-features
 
 audit:
     cargo audit
