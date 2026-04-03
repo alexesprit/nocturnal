@@ -7,22 +7,35 @@ use crate::td::{NextAction, Td};
 use crate::usage;
 
 /// Returns Ok(true) if work was attempted, Ok(false) if nothing to do.
-pub fn run(ctx: &ProjectContext) -> Result<()> {
+pub fn run(ctx: &ProjectContext, task_id: Option<&str>) -> Result<()> {
     let slug = ctx.project_slug();
     let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("run-{slug}"))?;
 
-    let did_work = run_inner(ctx)?;
+    let did_work = run_inner(ctx, task_id)?;
     if !did_work {
         info!("Nothing to do — no reviewable or open tasks");
     }
     Ok(())
 }
 
-pub(crate) fn run_inner(ctx: &ProjectContext) -> Result<bool> {
+pub(crate) fn run_inner(ctx: &ProjectContext, task_id: Option<&str>) -> Result<bool> {
     let td = Td::new(&ctx.project_root);
 
-    // false: proposals are handled exclusively by `proposal`/`proposal-rotate` commands.
-    let action = td.get_next_action(false)?;
+    // When a task ID is pinned, determine the starting action from task status.
+    // Otherwise, ask td for the next action automatically.
+    let action = if let Some(id) = task_id {
+        let task = td
+            .show(id)
+            .map_err(|_| anyhow::anyhow!("Task '{id}' not found"))?;
+        if task.status == "in_review" {
+            NextAction::Review(id.to_string())
+        } else {
+            NextAction::Implement(id.to_string())
+        }
+    } else {
+        // false: proposals are handled exclusively by `proposal`/`proposal-rotate` commands.
+        td.get_next_action(false)?
+    };
 
     if let NextAction::Idle = &action {
         if ctx.cfg.dry_run {

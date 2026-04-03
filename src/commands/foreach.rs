@@ -50,7 +50,7 @@ pub fn run(cfg: &Config) -> Result<()> {
             continue;
         }
 
-        match super::run::run_inner(&ctx) {
+        match super::run::run_inner(&ctx, None) {
             Ok(_) => {}
             Err(e) => {
                 error!("cmd_run failed for {}: {e:#}", project_root.display());

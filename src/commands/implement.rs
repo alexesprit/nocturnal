@@ -3,21 +3,29 @@ use tracing::{error, info};
 
 use crate::config::ProjectContext;
 use crate::{claude, git, lock, prompt, td};
-pub fn run(ctx: &ProjectContext) -> Result<()> {
+pub fn run(ctx: &ProjectContext, task_id: Option<&str>) -> Result<()> {
     let slug = ctx.project_slug();
     let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("implement-{slug}"))?;
 
-    run_unlocked(ctx)
+    run_unlocked(ctx, task_id)
 }
 
-fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
+fn run_unlocked(ctx: &ProjectContext, task_id: Option<&str>) -> Result<()> {
     let td = td::Td::new(&ctx.project_root);
 
-    let task_id = td
-        .get_next_task_id()?
-        .ok_or_else(|| anyhow::anyhow!("No open tasks found"))?;
+    let resolved_id = match task_id {
+        Some(id) => {
+            // Validate that the task exists
+            td.show(id)
+                .map_err(|_| anyhow::anyhow!("Task '{id}' not found"))?;
+            id.to_string()
+        }
+        None => td
+            .get_next_task_id()?
+            .ok_or_else(|| anyhow::anyhow!("No open tasks found"))?,
+    };
 
-    implement_task(ctx, &task_id).map(|_| ())
+    implement_task(ctx, &resolved_id).map(|_| ())
 }
 
 /// Implement a specific task. Returns Ok(true) if implementation succeeded

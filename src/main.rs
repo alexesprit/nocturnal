@@ -40,9 +40,17 @@ enum Command {
     /// Bootstrap a project directory for use with nocturnal
     Init,
     /// Implement and review the next open task [default]
-    Develop,
+    Develop {
+        /// Target a specific task ID instead of picking the next one automatically
+        #[arg(long)]
+        task: Option<String>,
+    },
     /// Pick and implement the highest-priority open task
-    Implement,
+    Implement {
+        /// Target a specific task ID instead of picking the next one automatically
+        #[arg(long)]
+        task: Option<String>,
+    },
     /// Pick and review the next reviewable task
     Review,
     /// Check open proposals for review comments and address them
@@ -86,7 +94,7 @@ fn main() {
 fn run(cli: Cli) -> Result<()> {
     let mut cfg = config::Config::from_env();
     cfg.dry_run = cli.dry_run;
-    let command = cli.command.unwrap_or(Command::Develop);
+    let command = cli.command.unwrap_or(Command::Develop { task: None });
 
     let project_root = match cli.project {
         Some(p) => std::path::PathBuf::from(p),
@@ -104,8 +112,8 @@ fn run(cli: Cli) -> Result<()> {
 
             let ctx = config::ProjectContext::new(cfg, project_root);
             match command {
-                Command::Develop => commands::run::run(&ctx),
-                Command::Implement => commands::implement::run(&ctx),
+                Command::Develop { task } => commands::run::run(&ctx, task.as_deref()),
+                Command::Implement { task } => commands::implement::run(&ctx, task.as_deref()),
                 Command::Review => commands::review::run(&ctx),
                 Command::Proposal => commands::proposal_review::run(&ctx),
                 Command::Gc => commands::gc::run(&ctx),
