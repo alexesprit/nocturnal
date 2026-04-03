@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{Result, bail};
 
-use crate::backend::{AiBackend, ClaudeBackend};
+use crate::backend::{AiBackend, ClaudeBackend, CodexBackend};
 use crate::project_config::{self, MergeStrategy, Provider, VcsMode};
 
 #[derive(Clone)]
@@ -39,10 +39,16 @@ pub struct ProjectContext {
 impl ProjectContext {
     pub fn new(cfg: Config, project_root: PathBuf) -> Self {
         let settings = project_config::load_project_settings(&project_root);
-        let backend = Arc::new(ClaudeBackend {
-            log_dir: cfg.log_dir.clone(),
-            max_budget: settings.max_budget,
-        });
+        let backend: Arc<dyn AiBackend> = match settings.provider {
+            Provider::Claude => Arc::new(ClaudeBackend {
+                log_dir: cfg.log_dir.clone(),
+                max_budget: settings.max_budget,
+            }),
+            Provider::Codex => Arc::new(CodexBackend {
+                log_dir: cfg.log_dir.clone(),
+                max_budget: settings.max_budget,
+            }),
+        };
         Self {
             cfg,
             project_root,
