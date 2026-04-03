@@ -132,6 +132,8 @@ pub struct ListOpts {
     pub query: Option<String>,
     pub sort: Option<String>,
     pub all: bool,
+    pub limit: Option<usize>,
+    pub reverse: bool,
 }
 
 impl Default for ListOpts {
@@ -143,6 +145,8 @@ impl Default for ListOpts {
             query: None,
             sort: Some("priority".to_string()),
             all: false,
+            limit: None,
+            reverse: false,
         }
     }
 }
@@ -265,6 +269,17 @@ impl<'a> Td<'a> {
             sort_val = s.clone();
             args.push("--sort");
             args.push(&sort_val);
+        }
+
+        if opts.reverse {
+            args.push("--reverse");
+        }
+
+        let limit_val;
+        if let Some(n) = opts.limit {
+            limit_val = n.to_string();
+            args.push("--limit");
+            args.push(&limit_val);
         }
 
         let json = self.run(&args)?;

@@ -18,4 +18,33 @@
 {% include "partials/table_wrapper.html" %}
 {% endif %}
 </div>
+{% if !recently_closed.is_empty() %}
+<section class="recently-closed">
+    <h2>Recently Closed</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Priority</th>
+                <th>Type</th>
+                <th>Closed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for issue in recently_closed %}
+            <tr data-href="/projects/{{ name }}/issues/{{ issue.id }}" tabindex="0" role="link">
+                <td><code>{{ issue.id }}</code></td>
+                <td>{{ issue.title }}</td>
+                <td>
+                    <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
+                </td>
+                <td>{{ issue.task_type }}</td>
+                <td>{{ issue.closed_at|format_date }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
 {% endblock %}

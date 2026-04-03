@@ -74,6 +74,7 @@ struct ProjectTemplate {
     in_progress: Vec<Task>,
     blocked: Vec<Task>,
     in_review: Vec<Task>,
+    recently_closed: Vec<Task>,
 }
 
 #[derive(Template)]
@@ -557,18 +558,33 @@ pub async fn project(
     let view = sanitize_param(&params.view, ALLOWED_VIEWS).unwrap_or_else(|| "table".to_string());
 
     let path = entry.path.clone();
+    let path2 = entry.path.clone();
     let project_name = name.clone();
 
-    let result = tokio::task::spawn_blocking(move || {
+    let active_handle = tokio::task::spawn_blocking(move || {
         Td::new(&path).list(&ListOpts {
             sort: Some("priority".to_string()),
             ..Default::default()
         })
-    })
-    .await;
+    });
 
-    match result {
+    let closed_handle = tokio::task::spawn_blocking(move || {
+        Td::new(&path2).list(&ListOpts {
+            status: Some("closed".to_string()),
+            sort: Some("closed_at".to_string()),
+            reverse: true,
+            limit: Some(10),
+            all: true,
+            ..Default::default()
+        })
+    });
+
+    let (active_result, closed_result) = tokio::join!(active_handle, closed_handle);
+
+    match active_result {
         Ok(Ok(issues)) => {
+            let recently_closed = closed_result.ok().and_then(|r| r.ok()).unwrap_or_default();
+
             let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
                 let (o, ip, bl, ir) = group_by_status(issues);
                 (Vec::new(), o, ip, bl, ir)
@@ -588,6 +604,7 @@ pub async fn project(
                 in_progress,
                 blocked,
                 in_review,
+                recently_closed,
             };
             into_html_response(tmpl)
         }
@@ -643,9 +660,11 @@ pub async fn project_issues(
         query,
         sort: sanitize_param(&params.sort, ALLOWED_SORTS).or(Some("priority".to_string())),
         all: false,
+        ..Default::default()
     };
 
     let path = entry.path.clone();
+    let path2 = entry.path.clone();
     let project_name = name.clone();
 
     let result = tokio::task::spawn_blocking(move || Td::new(&path).list(&opts)).await;
@@ -668,6 +687,21 @@ pub async fn project_issues(
                     into_html_response(tmpl)
                 }
             } else {
+                let recently_closed = tokio::task::spawn_blocking(move || {
+                    Td::new(&path2).list(&ListOpts {
+                        status: Some("closed".to_string()),
+                        sort: Some("closed_at".to_string()),
+                        reverse: true,
+                        limit: Some(10),
+                        all: true,
+                        ..Default::default()
+                    })
+                })
+                .await
+                .ok()
+                .and_then(|r| r.ok())
+                .unwrap_or_default();
+
                 let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
                     let (o, ip, bl, ir) = group_by_status(issues);
                     (Vec::new(), o, ip, bl, ir)
@@ -687,6 +721,7 @@ pub async fn project_issues(
                     in_progress,
                     blocked,
                     in_review,
+                    recently_closed,
                 };
                 into_html_response(tmpl)
             }
