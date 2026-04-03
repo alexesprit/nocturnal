@@ -2,7 +2,7 @@ use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 
 use askama::Template;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Form, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use serde::Deserialize;
@@ -912,6 +912,60 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
     }
 }
 
+#[derive(Deserialize)]
+pub struct PriorityForm {
+    priority: String,
+}
+
+pub async fn update_priority(
+    State(state): State<Arc<AppState>>,
+    Path((name, id)): Path<(String, String)>,
+    Form(form): Form<PriorityForm>,
+) -> Response {
+    if !is_valid_issue_id(&id) {
+        return (StatusCode::BAD_REQUEST, "invalid issue id").into_response();
+    }
+
+    let valid_priorities = &ALLOWED_PRIORITIES[1..]; // exclude "all"
+    let priority = match sanitize_param(&form.priority, valid_priorities) {
+        Some(p) => p,
+        None => return (StatusCode::BAD_REQUEST, "invalid priority").into_response(),
+    };
+
+    let entry = match state.find_project(&name) {
+        Some(e) => e,
+        None => return (StatusCode::NOT_FOUND, "project not found").into_response(),
+    };
+
+    let path = entry.path.clone();
+    let issue_id = id.clone();
+    let priority_clone = priority.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let td = Td::new(&path);
+        td.update_priority(&issue_id, &priority_clone)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(())) => {
+            let html = priority_select_html(&name, &id, &priority);
+            Html(html).into_response()
+        }
+        Ok(Err(e)) => {
+            error!("update_priority failed for {name}/{id}: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update priority",
+            )
+                .into_response()
+        }
+        Err(e) => {
+            error!("task join error: {e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
+        }
+    }
+}
+
 // --- Helpers ---
 
 fn into_html_response<T: Template>(tmpl: T) -> Response {
@@ -922,4 +976,20 @@ fn into_html_response<T: Template>(tmpl: T) -> Response {
             (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
         }
     }
+}
+
+fn priority_select_html(project_name: &str, issue_id: &str, current_priority: &str) -> String {
+    let priorities = &["P0", "P1", "P2", "P3", "P4"];
+    let mut options = String::new();
+    for p in priorities {
+        let selected = if *p == current_priority {
+            " selected"
+        } else {
+            ""
+        };
+        options.push_str(&format!(r#"<option value="{p}"{selected}>{p}</option>"#));
+    }
+    format!(
+        "<span class=\"priority-select-wrapper badge badge-priority badge-priority-{current_priority}\" id=\"priority-select-{issue_id}\"><select class=\"priority-select\" hx-post=\"/api/projects/{project_name}/issues/{issue_id}/priority\" hx-trigger=\"change\" hx-target=\"#priority-select-{issue_id}\" hx-swap=\"outerHTML\" name=\"priority\">{options}</select></span>"
+    )
 }

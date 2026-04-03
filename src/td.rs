@@ -457,6 +457,11 @@ impl<'a> Td<'a> {
         self.run(&["update", task_id, "--labels", labels])?;
         Ok(())
     }
+
+    pub fn update_priority(&self, task_id: &str, priority: &str) -> Result<()> {
+        self.run(&["update", task_id, "--priority", priority])?;
+        Ok(())
+    }
 }
 
 pub enum NextAction {
