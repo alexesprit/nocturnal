@@ -1,9 +1,11 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{Result, bail};
 
+use crate::backend::{AiBackend, ClaudeBackend};
 use crate::project_config::{self, MergeStrategy, VcsMode};
 
 #[derive(Clone)]
@@ -25,16 +27,20 @@ pub struct ProjectContext {
     pub target_branch: String,
     pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
-    pub max_budget: Option<u32>,
     pub implement_model: String,
     pub review_model: String,
     pub pre_merge_hooks: Vec<String>,
     pub post_merge_hooks: Vec<String>,
+    pub backend: Arc<dyn AiBackend>,
 }
 
 impl ProjectContext {
     pub fn new(cfg: Config, project_root: PathBuf) -> Self {
         let settings = project_config::load_project_settings(&project_root);
+        let backend = Arc::new(ClaudeBackend {
+            log_dir: cfg.log_dir.clone(),
+            max_budget: settings.max_budget,
+        });
         Self {
             cfg,
             project_root,
@@ -45,11 +51,11 @@ impl ProjectContext {
             target_branch: settings.target_branch,
             merge_strategy: settings.merge_strategy,
             max_reviews: settings.max_reviews,
-            max_budget: settings.max_budget,
             implement_model: settings.implement_model,
             review_model: settings.review_model,
             pre_merge_hooks: settings.pre_merge_hooks,
             post_merge_hooks: settings.post_merge_hooks,
+            backend,
         }
     }
 

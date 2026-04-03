@@ -79,8 +79,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     let slug = ctx.project_slug();
     let log_file = claude::log_path(&ctx.cfg.log_dir, "review", task_id);
 
-    if !claude::run(
-        ctx,
+    if !ctx.backend.run(
         &wt_path,
         &rendered,
         &log_file,
