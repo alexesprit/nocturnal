@@ -6,7 +6,16 @@ use serde::Deserialize;
 pub const DEFAULT_MAX_REVIEWS: u32 = 3;
 pub const DEFAULT_MAX_BUDGET: Option<u32> = None;
 pub const DEFAULT_MODEL: &str = "sonnet";
+pub const DEFAULT_CODEX_MODEL: &str = "o3";
 pub const DEFAULT_TARGET_BRANCH: &str = "main";
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Provider {
+    #[default]
+    Claude,
+    Codex,
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -53,13 +62,22 @@ struct ClaudeConfig {
     review_model: Option<String>,
 }
 
+#[derive(Debug, Default, Deserialize)]
+struct CodexConfig {
+    model: Option<String>,
+    implement_model: Option<String>,
+    review_model: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct ProjectConfig {
     vcs: Option<VcsConfig>,
     hooks: Option<HooksConfig>,
     max_reviews: Option<u32>,
     max_budget: Option<u32>,
+    provider: Option<Provider>,
     claude: Option<ClaudeConfig>,
+    codex: Option<CodexConfig>,
 }
 
 pub struct ProjectSettings {
@@ -71,6 +89,7 @@ pub struct ProjectSettings {
     pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
+    pub provider: Provider,
     pub implement_model: String,
     pub review_model: String,
     pub pre_merge_hooks: Vec<String>,
@@ -98,10 +117,35 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
     match toml::from_str::<ProjectConfig>(&content) {
         Ok(f) => {
             let vcs = f.vcs.unwrap_or_default();
-            let claude = f.claude.unwrap_or_default();
-            let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
             let hooks = f.hooks.unwrap_or_default();
             let merge_strategy = resolve_merge_strategy(&vcs);
+            let provider = f.provider.unwrap_or_default();
+            let (implement_model, review_model) = match provider {
+                Provider::Codex => {
+                    let codex = f.codex.unwrap_or_default();
+                    let default_model = codex.model.as_deref().unwrap_or(DEFAULT_CODEX_MODEL);
+                    (
+                        codex
+                            .implement_model
+                            .unwrap_or_else(|| default_model.to_string()),
+                        codex
+                            .review_model
+                            .unwrap_or_else(|| default_model.to_string()),
+                    )
+                }
+                Provider::Claude => {
+                    let claude = f.claude.unwrap_or_default();
+                    let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
+                    (
+                        claude
+                            .implement_model
+                            .unwrap_or_else(|| default_model.to_string()),
+                        claude
+                            .review_model
+                            .unwrap_or_else(|| default_model.to_string()),
+                    )
+                }
+            };
             let base_branch = vcs
                 .base_branch
                 .filter(|b| {
@@ -132,12 +176,9 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                 merge_strategy,
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
-                implement_model: claude
-                    .implement_model
-                    .unwrap_or_else(|| default_model.to_string()),
-                review_model: claude
-                    .review_model
-                    .unwrap_or_else(|| default_model.to_string()),
+                provider,
+                implement_model,
+                review_model,
                 pre_merge_hooks: hooks.pre_merge.unwrap_or_default(),
                 post_merge_hooks: hooks.post_merge.unwrap_or_default(),
             }
@@ -160,6 +201,7 @@ impl Default for ProjectSettings {
             merge_strategy: MergeStrategy::default(),
             max_reviews: DEFAULT_MAX_REVIEWS,
             max_budget: DEFAULT_MAX_BUDGET,
+            provider: Provider::default(),
             implement_model: DEFAULT_MODEL.to_string(),
             review_model: DEFAULT_MODEL.to_string(),
             pre_merge_hooks: Vec::new(),
@@ -534,6 +576,107 @@ mod tests {
         assert!(validate_branch_name("release-1.0"));
         assert!(validate_branch_name("v2.0.0"));
         assert!(validate_branch_name("user@feature"));
+    }
+
+    // --- Provider ---
+
+    #[test]
+    fn provider_defaults_to_claude() {
+        let f: ProjectConfig = toml::from_str("").unwrap();
+        assert_eq!(f.provider.unwrap_or_default(), Provider::Claude);
+    }
+
+    #[test]
+    fn parse_provider_claude_explicit() {
+        let f: ProjectConfig = toml::from_str("provider = \"claude\"").unwrap();
+        assert_eq!(f.provider.unwrap(), Provider::Claude);
+    }
+
+    #[test]
+    fn parse_provider_codex() {
+        let f: ProjectConfig = toml::from_str("provider = \"codex\"").unwrap();
+        assert_eq!(f.provider.unwrap(), Provider::Codex);
+    }
+
+    #[test]
+    fn parse_unrecognized_provider_is_error() {
+        assert!(toml::from_str::<ProjectConfig>("provider = \"openai\"").is_err());
+    }
+
+    #[test]
+    fn codex_section_parses_all_fields() {
+        let f: ProjectConfig = toml::from_str(
+            "provider = \"codex\"\n[codex]\nmodel = \"o3\"\nimplement_model = \"o4-mini\"\nreview_model = \"o3-mini\"",
+        )
+        .unwrap();
+        let codex = f.codex.unwrap();
+        assert_eq!(codex.model.as_deref(), Some("o3"));
+        assert_eq!(codex.implement_model.as_deref(), Some("o4-mini"));
+        assert_eq!(codex.review_model.as_deref(), Some("o3-mini"));
+    }
+
+    #[test]
+    fn codex_model_fallback_to_model() {
+        let f: ProjectConfig =
+            toml::from_str("provider = \"codex\"\n[codex]\nmodel = \"o3\"").unwrap();
+        let codex = f.codex.unwrap();
+        let default_model = codex.model.as_deref().unwrap_or(DEFAULT_CODEX_MODEL);
+        let implement_model = codex
+            .implement_model
+            .unwrap_or_else(|| default_model.to_string());
+        assert_eq!(implement_model, "o3");
+    }
+
+    #[test]
+    fn codex_model_fallback_to_default_constant() {
+        let f: ProjectConfig = toml::from_str("provider = \"codex\"\n[codex]").unwrap();
+        let codex = f.codex.unwrap();
+        let default_model = codex.model.as_deref().unwrap_or(DEFAULT_CODEX_MODEL);
+        assert_eq!(default_model, DEFAULT_CODEX_MODEL);
+        let implement_model = codex
+            .implement_model
+            .unwrap_or_else(|| default_model.to_string());
+        assert_eq!(implement_model, DEFAULT_CODEX_MODEL);
+    }
+
+    #[test]
+    fn load_settings_with_codex_provider() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(
+            f,
+            "provider = \"codex\"\n[codex]\nmodel = \"o3\"\nimplement_model = \"o4-mini\"\n"
+        )
+        .unwrap();
+        let settings = load_project_settings(dir.path());
+        assert_eq!(settings.provider, Provider::Codex);
+        assert_eq!(settings.implement_model, "o4-mini");
+        assert_eq!(settings.review_model, "o3");
+    }
+
+    #[test]
+    fn load_settings_with_claude_provider_explicit() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(
+            f,
+            "provider = \"claude\"\n[claude]\nmodel = \"opus\"\nreview_model = \"haiku\"\n"
+        )
+        .unwrap();
+        let settings = load_project_settings(dir.path());
+        assert_eq!(settings.provider, Provider::Claude);
+        assert_eq!(settings.implement_model, "opus");
+        assert_eq!(settings.review_model, "haiku");
+    }
+
+    #[test]
+    fn load_settings_missing_provider_defaults_to_claude() {
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        assert_eq!(settings.provider, Provider::Claude);
     }
 
     #[test]

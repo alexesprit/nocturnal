@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::{Result, bail};
 
 use crate::backend::{AiBackend, ClaudeBackend};
-use crate::project_config::{self, MergeStrategy, VcsMode};
+use crate::project_config::{self, MergeStrategy, Provider, VcsMode};
 
 #[derive(Clone)]
 pub struct Config {
@@ -27,6 +27,8 @@ pub struct ProjectContext {
     pub target_branch: String,
     pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
+    #[allow(dead_code)]
+    pub provider: Provider,
     pub implement_model: String,
     pub review_model: String,
     pub pre_merge_hooks: Vec<String>,
@@ -51,6 +53,7 @@ impl ProjectContext {
             target_branch: settings.target_branch,
             merge_strategy: settings.merge_strategy,
             max_reviews: settings.max_reviews,
+            provider: settings.provider,
             implement_model: settings.implement_model,
             review_model: settings.review_model,
             pre_merge_hooks: settings.pre_merge_hooks,
