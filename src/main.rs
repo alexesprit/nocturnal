@@ -16,6 +16,7 @@ mod web;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::error;
+use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
 #[command(
@@ -75,13 +76,43 @@ enum Command {
 }
 
 fn main() {
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    let make_filter =
+        || EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    let tmpdir = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
+    let log_dir = std::path::PathBuf::from(
+        std::env::var("NOCTURNAL_LOG_DIR").unwrap_or_else(|_| format!("{tmpdir}/nocturnal-logs")),
+    );
+    std::fs::create_dir_all(&log_dir).ok();
+
+    let log_path = log_dir.join(format!(
+        "nocturnal-{}.log",
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    ));
+
+    let stdout_layer = fmt::layer().with_target(false).with_filter(make_filter());
+
+    match std::fs::File::create(&log_path) {
+        Ok(log_file) => {
+            let file_layer = fmt::layer()
+                .with_target(false)
+                .with_ansi(false)
+                .with_writer(log_file)
+                .with_filter(make_filter());
+            tracing_subscriber::registry()
+                .with(stdout_layer)
+                .with(file_layer)
+                .init();
+            println!("Trace log: {}", log_path.display());
+        }
+        Err(e) => {
+            tracing_subscriber::registry().with(stdout_layer).init();
+            eprintln!(
+                "Warning: could not create trace log at {}: {e}",
+                log_path.display()
+            );
+        }
+    }
 
     let cli = Cli::parse();
 
