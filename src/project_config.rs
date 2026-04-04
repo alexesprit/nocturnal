@@ -6,7 +6,8 @@ use serde::Deserialize;
 pub const DEFAULT_MAX_REVIEWS: u32 = 3;
 pub const DEFAULT_MAX_BUDGET: Option<u32> = None;
 pub const DEFAULT_MODEL: &str = "sonnet";
-pub const DEFAULT_CODEX_MODEL: &str = "o3";
+pub const DEFAULT_CODEX_MODEL: &str = "gpt-5.4";
+pub const DEFAULT_CODEX_REASONING_EFFORT: &str = "high";
 pub const DEFAULT_TARGET_BRANCH: &str = "main";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
@@ -67,6 +68,7 @@ struct CodexConfig {
     model: Option<String>,
     implement_model: Option<String>,
     review_model: Option<String>,
+    reasoning_effort: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -98,6 +100,7 @@ pub struct ProjectSettings {
     pub review_provider: Provider,
     pub implement_model: String,
     pub review_model: String,
+    pub codex_reasoning_effort: String,
     pub pre_merge_hooks: Vec<String>,
     pub post_merge_hooks: Vec<String>,
 }
@@ -177,6 +180,12 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                         .unwrap_or_else(|| default_model.to_string())
                 }
             };
+            let codex_reasoning_effort = f
+                .codex
+                .as_ref()
+                .and_then(|c| c.reasoning_effort.clone())
+                .unwrap_or_else(|| DEFAULT_CODEX_REASONING_EFFORT.to_string());
+
             let base_branch = vcs
                 .base_branch
                 .filter(|b| {
@@ -213,6 +222,7 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                 review_provider,
                 implement_model,
                 review_model,
+                codex_reasoning_effort,
                 pre_merge_hooks: hooks.pre_merge.unwrap_or_default(),
                 post_merge_hooks: hooks.post_merge.unwrap_or_default(),
             }
@@ -241,6 +251,7 @@ impl Default for ProjectSettings {
             review_provider: Provider::default(),
             implement_model: DEFAULT_MODEL.to_string(),
             review_model: DEFAULT_MODEL.to_string(),
+            codex_reasoning_effort: DEFAULT_CODEX_REASONING_EFFORT.to_string(),
             pre_merge_hooks: Vec::new(),
             post_merge_hooks: Vec::new(),
         }

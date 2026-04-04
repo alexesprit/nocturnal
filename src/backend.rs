@@ -113,6 +113,7 @@ impl AiBackend for ClaudeBackend {
 pub struct CodexBackend {
     pub log_dir: PathBuf,
     pub max_budget: Option<u32>,
+    pub reasoning_effort: String,
 }
 
 impl AiBackend for CodexBackend {
@@ -133,7 +134,10 @@ impl AiBackend for CodexBackend {
             warn!("max_budget is configured but codex does not support --max-budget-usd; ignoring");
         }
 
-        info!("Running Codex (model={model})...");
+        info!(
+            "Running Codex (model={model}, reasoning_effort={})...",
+            self.reasoning_effort
+        );
         info!("Log: {}", log_file.display());
 
         let started_at = chrono::Local::now();
@@ -145,8 +149,17 @@ impl AiBackend for CodexBackend {
         // `--full-auto` is required for unattended operation: Codex cannot prompt for approval
         // when running non-interactively. This grants unrestricted execution access.
         // See the "Security / Trust Model" section in CLAUDE.md for the full trust boundary analysis.
+        let effort_config = format!("model_reasoning_effort=\"{}\"", self.reasoning_effort);
         let status = Command::new("codex")
-            .args(["-q", "--full-auto", "--model", model, prompt])
+            .args([
+                "exec",
+                "--full-auto",
+                "--model",
+                model,
+                "--config",
+                &effort_config,
+                prompt,
+            ])
             .current_dir(wt_path)
             .stdout(output_file)
             .stderr(stderr_file)
