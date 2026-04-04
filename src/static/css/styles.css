@@ -538,7 +538,7 @@ tr[data-href] {
   cursor: pointer;
 }
 
-td:nth-child(2) {
+.issue-table td:nth-child(2) {
   max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
