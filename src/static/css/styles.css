@@ -89,43 +89,6 @@
     --grain-opacity: 0.015;
 }
 
-/* Light theme — system preference (when no explicit theme set) */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg-primary: #f5f4f1;
-    --bg-secondary: #eae8e4;
-    --bg-tertiary: #dedcd8;
-    --bg-elevated: #d4d2ce;
-    --bg-hover: #cccac6;
-
-    --text-primary: #1a1a1e;
-    --text-secondary: #4a4844;
-    --text-tertiary: #7a7874;
-    --text-inverse: #f5f4f1;
-
-    --accent: #c47a10;
-    --accent-dim: #a86808;
-    --accent-glow: rgba(196, 122, 16, 0.12);
-
-    --border: #d4d2ce;
-    --border-strong: #bbb9b5;
-
-    --status-open: #2563eb;
-    --status-in-progress: #c47a10;
-    --status-blocked: #dc2626;
-    --status-in-review: #7c3aed;
-    --status-closed: #6b7280;
-
-    --priority-p0: #dc2626;
-    --priority-p1: #ea580c;
-    --priority-p2: #c47a10;
-    --priority-p3: #7a7874;
-    --priority-p4: #9a9894;
-
-    --badge-filled-text: #fff;
-    --grain-opacity: 0.015;
-  }
-}
 
 /* ============================================
    Reset & Base

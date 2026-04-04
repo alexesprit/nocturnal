@@ -12,6 +12,8 @@
             var t = localStorage.getItem("theme");
             if (t === "light" || t === "dark") {
                 document.documentElement.setAttribute("data-theme", t);
+            } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+                document.documentElement.setAttribute("data-theme", "light");
             }
         })();
     </script>
@@ -61,16 +63,33 @@
             var iconMoon = document.getElementById("theme-icon-moon");
             var iconSystem = document.getElementById("theme-icon-system");
             var btn = document.getElementById("theme-toggle");
+            var mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)");
+            var mqListener = null;
 
             function current() {
                 return localStorage.getItem("theme") || "system";
+            }
+
+            function applySystemTheme() {
+                if (mq && mq.matches) {
+                    document.documentElement.setAttribute("data-theme", "light");
+                } else {
+                    document.documentElement.removeAttribute("data-theme");
+                }
             }
 
             function apply(mode) {
                 if (mode === "light" || mode === "dark") {
                     document.documentElement.setAttribute("data-theme", mode);
                 } else {
-                    document.documentElement.removeAttribute("data-theme");
+                    applySystemTheme();
+                }
+                if (mode === "system" && mq && !mqListener) {
+                    mqListener = function() { applySystemTheme(); };
+                    mq.addEventListener("change", mqListener);
+                } else if (mode !== "system" && mqListener) {
+                    mq.removeEventListener("change", mqListener);
+                    mqListener = null;
                 }
                 localStorage.setItem("theme", mode);
                 iconSun.style.display = mode === "light" ? "block" : "none";
