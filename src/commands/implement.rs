@@ -1,5 +1,5 @@
 use anyhow::Result;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::config::ProjectContext;
 use crate::{claude, git, lock, preflight, prompt, td};
@@ -83,7 +83,9 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     )? {
         info!("Implementation completed");
         // best-effort: orchestrator will pick up the task for review on next cycle if this fails
-        td.review(task_id).ok();
+        if let Err(e) = td.review(task_id) {
+            warn!("Failed to transition {task_id} to review: {e:#}");
+        }
         info!("Task {task_id} submitted for review");
         Ok(true)
     } else {
