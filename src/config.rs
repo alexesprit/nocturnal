@@ -33,21 +33,30 @@ pub struct ProjectContext {
     pub review_model: String,
     pub pre_merge_hooks: Vec<String>,
     pub post_merge_hooks: Vec<String>,
-    pub backend: Arc<dyn AiBackend>,
+    pub implement_backend: Arc<dyn AiBackend>,
+    pub review_backend: Arc<dyn AiBackend>,
 }
 
 impl ProjectContext {
     pub fn new(cfg: Config, project_root: PathBuf) -> Self {
         let settings = project_config::load_project_settings(&project_root);
-        let backend: Arc<dyn AiBackend> = match settings.provider {
-            Provider::Claude => Arc::new(ClaudeBackend {
-                log_dir: cfg.log_dir.clone(),
-                max_budget: settings.max_budget,
-            }),
-            Provider::Codex => Arc::new(CodexBackend {
-                log_dir: cfg.log_dir.clone(),
-                max_budget: settings.max_budget,
-            }),
+        let make_backend = |provider: Provider| -> Arc<dyn AiBackend> {
+            match provider {
+                Provider::Claude => Arc::new(ClaudeBackend {
+                    log_dir: cfg.log_dir.clone(),
+                    max_budget: settings.max_budget,
+                }),
+                Provider::Codex => Arc::new(CodexBackend {
+                    log_dir: cfg.log_dir.clone(),
+                    max_budget: settings.max_budget,
+                }),
+            }
+        };
+        let implement_backend = make_backend(settings.implement_provider);
+        let review_backend = if settings.review_provider == settings.implement_provider {
+            Arc::clone(&implement_backend)
+        } else {
+            make_backend(settings.review_provider)
         };
         Self {
             cfg,
@@ -64,7 +73,8 @@ impl ProjectContext {
             review_model: settings.review_model,
             pre_merge_hooks: settings.pre_merge_hooks,
             post_merge_hooks: settings.post_merge_hooks,
-            backend,
+            implement_backend,
+            review_backend,
         }
     }
 

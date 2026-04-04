@@ -77,6 +77,8 @@ struct ProjectConfig {
     max_budget: Option<u32>,
     auto_develop: Option<bool>,
     provider: Option<Provider>,
+    implement_provider: Option<Provider>,
+    review_provider: Option<Provider>,
     claude: Option<ClaudeConfig>,
     codex: Option<CodexConfig>,
 }
@@ -92,6 +94,8 @@ pub struct ProjectSettings {
     pub max_budget: Option<u32>,
     pub auto_develop: bool,
     pub provider: Provider,
+    pub implement_provider: Provider,
+    pub review_provider: Provider,
     pub implement_model: String,
     pub review_model: String,
     pub pre_merge_hooks: Vec<String>,
@@ -122,30 +126,55 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
             let hooks = f.hooks.unwrap_or_default();
             let merge_strategy = resolve_merge_strategy(&vcs);
             let provider = f.provider.unwrap_or_default();
-            let (implement_model, review_model) = match provider {
+            let implement_provider = f.implement_provider.unwrap_or(provider);
+            let review_provider = f.review_provider.unwrap_or(provider);
+
+            let implement_model = match implement_provider {
                 Provider::Codex => {
-                    let codex = f.codex.unwrap_or_default();
-                    let default_model = codex.model.as_deref().unwrap_or(DEFAULT_CODEX_MODEL);
-                    (
-                        codex
-                            .implement_model
-                            .unwrap_or_else(|| default_model.to_string()),
-                        codex
-                            .review_model
-                            .unwrap_or_else(|| default_model.to_string()),
-                    )
+                    let default_model = f
+                        .codex
+                        .as_ref()
+                        .and_then(|c| c.model.as_deref())
+                        .unwrap_or(DEFAULT_CODEX_MODEL);
+                    f.codex
+                        .as_ref()
+                        .and_then(|c| c.implement_model.clone())
+                        .unwrap_or_else(|| default_model.to_string())
                 }
                 Provider::Claude => {
-                    let claude = f.claude.unwrap_or_default();
-                    let default_model = claude.model.as_deref().unwrap_or(DEFAULT_MODEL);
-                    (
-                        claude
-                            .implement_model
-                            .unwrap_or_else(|| default_model.to_string()),
-                        claude
-                            .review_model
-                            .unwrap_or_else(|| default_model.to_string()),
-                    )
+                    let default_model = f
+                        .claude
+                        .as_ref()
+                        .and_then(|c| c.model.as_deref())
+                        .unwrap_or(DEFAULT_MODEL);
+                    f.claude
+                        .as_ref()
+                        .and_then(|c| c.implement_model.clone())
+                        .unwrap_or_else(|| default_model.to_string())
+                }
+            };
+            let review_model = match review_provider {
+                Provider::Codex => {
+                    let default_model = f
+                        .codex
+                        .as_ref()
+                        .and_then(|c| c.model.as_deref())
+                        .unwrap_or(DEFAULT_CODEX_MODEL);
+                    f.codex
+                        .as_ref()
+                        .and_then(|c| c.review_model.clone())
+                        .unwrap_or_else(|| default_model.to_string())
+                }
+                Provider::Claude => {
+                    let default_model = f
+                        .claude
+                        .as_ref()
+                        .and_then(|c| c.model.as_deref())
+                        .unwrap_or(DEFAULT_MODEL);
+                    f.claude
+                        .as_ref()
+                        .and_then(|c| c.review_model.clone())
+                        .unwrap_or_else(|| default_model.to_string())
                 }
             };
             let base_branch = vcs
@@ -180,6 +209,8 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
                 auto_develop: f.auto_develop.unwrap_or(true),
                 provider,
+                implement_provider,
+                review_provider,
                 implement_model,
                 review_model,
                 pre_merge_hooks: hooks.pre_merge.unwrap_or_default(),
@@ -206,6 +237,8 @@ impl Default for ProjectSettings {
             max_budget: DEFAULT_MAX_BUDGET,
             auto_develop: true,
             provider: Provider::default(),
+            implement_provider: Provider::default(),
+            review_provider: Provider::default(),
             implement_model: DEFAULT_MODEL.to_string(),
             review_model: DEFAULT_MODEL.to_string(),
             pre_merge_hooks: Vec::new(),
@@ -573,6 +606,106 @@ mod tests {
         write!(f, "auto_develop = false\n").unwrap();
         let settings = load_project_settings(dir.path());
         assert!(!settings.auto_develop);
+    }
+
+    // --- Per-action provider ---
+
+    #[test]
+    fn implement_provider_codex_review_provider_claude_mixed() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(
+            f,
+            concat!(
+                "provider = \"claude\"\n",
+                "implement_provider = \"codex\"\n",
+                "[codex]\nmodel = \"o3\"\nimplement_model = \"o4-mini\"\n",
+                "[claude]\nmodel = \"sonnet\"\nreview_model = \"haiku\"\n",
+            )
+        )
+        .unwrap();
+        let settings = load_project_settings(dir.path());
+        assert_eq!(settings.implement_provider, Provider::Codex);
+        assert_eq!(settings.review_provider, Provider::Claude);
+        assert_eq!(settings.implement_model, "o4-mini");
+        assert_eq!(settings.review_model, "haiku");
+    }
+
+    #[test]
+    fn only_implement_provider_set_review_falls_back_to_provider() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(
+            f,
+            concat!(
+                "provider = \"claude\"\n",
+                "implement_provider = \"codex\"\n",
+                "[codex]\nmodel = \"o3\"\n",
+                "[claude]\nmodel = \"opus\"\n",
+            )
+        )
+        .unwrap();
+        let settings = load_project_settings(dir.path());
+        assert_eq!(settings.implement_provider, Provider::Codex);
+        assert_eq!(settings.review_provider, Provider::Claude);
+        assert_eq!(settings.implement_model, "o3");
+        assert_eq!(settings.review_model, "opus");
+    }
+
+    #[test]
+    fn neither_per_action_provider_falls_back_to_provider() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(f, "provider = \"codex\"\n[codex]\nmodel = \"o3\"\n").unwrap();
+        let settings = load_project_settings(dir.path());
+        assert_eq!(settings.implement_provider, Provider::Codex);
+        assert_eq!(settings.review_provider, Provider::Codex);
+        assert_eq!(settings.implement_model, "o3");
+        assert_eq!(settings.review_model, "o3");
+    }
+
+    #[test]
+    fn both_per_action_providers_same_value() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(
+            f,
+            concat!(
+                "provider = \"claude\"\n",
+                "implement_provider = \"claude\"\n",
+                "review_provider = \"claude\"\n",
+                "[claude]\nmodel = \"opus\"\n",
+            )
+        )
+        .unwrap();
+        let settings = load_project_settings(dir.path());
+        assert_eq!(settings.implement_provider, Provider::Claude);
+        assert_eq!(settings.review_provider, Provider::Claude);
+        assert_eq!(settings.implement_model, "opus");
+        assert_eq!(settings.review_model, "opus");
+    }
+
+    #[test]
+    fn per_action_providers_default_to_claude() {
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        assert_eq!(settings.implement_provider, Provider::Claude);
+        assert_eq!(settings.review_provider, Provider::Claude);
+    }
+
+    #[test]
+    fn parse_implement_provider_and_review_provider() {
+        let f: ProjectConfig =
+            toml::from_str("implement_provider = \"codex\"\nreview_provider = \"claude\"").unwrap();
+        assert_eq!(f.implement_provider.unwrap(), Provider::Codex);
+        assert_eq!(f.review_provider.unwrap(), Provider::Claude);
     }
 
     #[test]

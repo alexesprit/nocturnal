@@ -72,7 +72,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     let slug = ctx.project_slug();
     let log_file = claude::log_path(&ctx.cfg.log_dir, "implement", task_id);
 
-    if ctx.backend.run(
+    if ctx.implement_backend.run(
         &wt_path,
         &rendered,
         &log_file,
