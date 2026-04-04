@@ -34,7 +34,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
         return Ok(false);
     }
 
-    let platform = vcs::detect_platform(&ctx.project_root, ctx.vcs_mode)
+    let platform = vcs::detect_platform(&ctx.project_root, ctx.settings.vcs_mode)
         .ok_or_else(|| anyhow::anyhow!("No VCS platform detected"))?;
 
     for task_id in task_ids {
@@ -62,7 +62,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             vcs::ProposalState::Merged => {
                 info!("Proposal #{proposal_id} merged — approving task");
                 td_client.approve(&task_id)?;
-                if ctx.delete_branch_on_merge {
+                if ctx.settings.delete_branch_on_merge {
                     let branch = git::worktree_branch(&task_id);
                     if vcs::delete_remote_branch(&wt_path, &branch) {
                         info!("Remote branch {branch} deleted");
@@ -70,7 +70,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
                         info!("Remote branch deletion failed (best-effort)");
                     }
                 }
-                vcs::run_post_merge_hooks(&ctx.project_root, &ctx.post_merge_hooks);
+                vcs::run_post_merge_hooks(&ctx.project_root, &ctx.settings.post_merge_hooks);
                 continue;
             }
             vcs::ProposalState::Closed => {
@@ -143,13 +143,13 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             prompt::Template::ProposalReview,
             &task_id,
             &ctx.project_root,
-            ctx.max_reviews,
+            ctx.settings.max_reviews,
             &prompt::VcsPrompt {
                 reply_cmd: &vcs_reply_cmd,
                 inline_reply_instructions: vcs_inline_reply_instructions,
                 resolve_rule: vcs_resolve_rule,
             },
-            &ctx.base_branch,
+            &ctx.settings.base_branch,
         );
         let _ = write!(
             rendered,
@@ -166,7 +166,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             command_name: "proposal",
             project: &slug,
             task_id: &task_id,
-            model: &ctx.review_model,
+            model: &ctx.settings.review_model,
         })? {
             info!("Proposal review completed");
         } else {
@@ -181,7 +181,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
 }
 
 pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
-    let platform = vcs::detect_platform(&ctx.project_root, ctx.vcs_mode)
+    let platform = vcs::detect_platform(&ctx.project_root, ctx.settings.vcs_mode)
         .ok_or_else(|| anyhow::anyhow!("No VCS platform detected — cannot create proposal"))?;
 
     let wt_path = git::worktree_path(&ctx.project_root, task_id)?
@@ -205,11 +205,17 @@ pub fn create_proposal(ctx: &ProjectContext, task_id: &str) -> Result<()> {
     };
     let desc = &task.description;
 
-    let proposal = vcs::create_proposal(platform, &wt_path, &title, desc, &ctx.target_branch)?;
+    let proposal = vcs::create_proposal(
+        platform,
+        &wt_path,
+        &title,
+        desc,
+        &ctx.settings.target_branch,
+    )?;
     info!("Proposal created: {platform} #{}", proposal.id);
 
     // Enable auto-merge (best-effort)
-    if ctx.auto_merge {
+    if ctx.settings.auto_merge {
         // Wait for CI pipelines to register on the new proposal before
         // requesting auto-merge. See AUTO_MERGE_DELAY for full rationale.
         std::thread::sleep(AUTO_MERGE_DELAY);

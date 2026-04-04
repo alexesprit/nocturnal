@@ -157,14 +157,14 @@ pub fn run_checks(ctx: &ProjectContext) -> Result<()> {
     }
 
     // 2. VCS remote reachable (warn only)
-    match ctx.vcs_mode {
+    match ctx.settings.vcs_mode {
         VcsMode::Auto | VcsMode::GitHub | VcsMode::GitLab => {
             check_vcs_remote(&ctx.project_root);
         }
         VcsMode::Local | VcsMode::Off => {
             debug!(
                 "Pre-flight: skipping remote check (vcs.mode={:?})",
-                ctx.vcs_mode
+                ctx.settings.vcs_mode
             );
         }
     }

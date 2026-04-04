@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::{Result, bail};
 
 use crate::backend::{AiBackend, ClaudeBackend, CodexBackend};
-use crate::project_config::{self, MergeStrategy, Provider, VcsMode};
+use crate::project_config::{self, ProjectSettings, Provider};
 
 #[derive(Clone)]
 pub struct Config {
@@ -20,19 +20,7 @@ pub struct Config {
 pub struct ProjectContext {
     pub cfg: Config,
     pub project_root: PathBuf,
-    pub vcs_mode: VcsMode,
-    pub auto_merge: bool,
-    pub delete_branch_on_merge: bool,
-    pub base_branch: String,
-    pub target_branch: String,
-    pub merge_strategy: MergeStrategy,
-    pub max_reviews: u32,
-    #[allow(dead_code)]
-    pub provider: Provider,
-    pub implement_model: String,
-    pub review_model: String,
-    pub pre_merge_hooks: Vec<String>,
-    pub post_merge_hooks: Vec<String>,
+    pub settings: ProjectSettings,
     pub implement_backend: Arc<dyn AiBackend>,
     pub review_backend: Arc<dyn AiBackend>,
 }
@@ -60,18 +48,7 @@ impl ProjectContext {
         Self {
             cfg,
             project_root,
-            vcs_mode: settings.vcs_mode,
-            auto_merge: settings.auto_merge,
-            delete_branch_on_merge: settings.delete_branch_on_merge,
-            base_branch: settings.base_branch,
-            target_branch: settings.target_branch,
-            merge_strategy: settings.merge_strategy,
-            max_reviews: settings.max_reviews,
-            provider: settings.provider,
-            implement_model: settings.implement_model,
-            review_model: settings.review_model,
-            pre_merge_hooks: settings.pre_merge_hooks,
-            post_merge_hooks: settings.post_merge_hooks,
+            settings,
             implement_backend,
             review_backend,
         }

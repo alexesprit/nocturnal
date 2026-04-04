@@ -37,10 +37,10 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
 
     let task = td.show(task_id)?;
     let review_count = td::get_review_count(&task);
-    if review_count >= ctx.max_reviews {
+    if review_count >= ctx.settings.max_reviews {
         info!(
             "Task {task_id} has {review_count} review cycles (max {}), skipping",
-            ctx.max_reviews
+            ctx.settings.max_reviews
         );
         return Ok(false);
     }
@@ -54,8 +54,13 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
 
     preflight::run_checks(ctx)?;
 
-    let local_only = ctx.vcs_mode == crate::project_config::VcsMode::Local;
-    let wt_path = git::ensure_worktree(&ctx.project_root, task_id, &ctx.base_branch, local_only)?;
+    let local_only = ctx.settings.vcs_mode == crate::project_config::VcsMode::Local;
+    let wt_path = git::ensure_worktree(
+        &ctx.project_root,
+        task_id,
+        &ctx.settings.base_branch,
+        local_only,
+    )?;
     info!("Worktree: {}", wt_path.display());
 
     // best-effort: task may already be in_progress from a previous attempt
@@ -65,8 +70,8 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         prompt::Template::Implement,
         task_id,
         &ctx.project_root,
-        ctx.max_reviews,
-        &ctx.base_branch,
+        ctx.settings.max_reviews,
+        &ctx.settings.base_branch,
     );
 
     let slug = ctx.project_slug();
@@ -79,11 +84,11 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         command_name: "implement",
         project: &slug,
         task_id,
-        model: &ctx.implement_model,
+        model: &ctx.settings.implement_model,
     })? {
         info!("Implementation completed");
         // Link changed files to the task (best-effort)
-        match git::changed_files(&wt_path, &ctx.base_branch) {
+        match git::changed_files(&wt_path, &ctx.settings.base_branch) {
             Ok(files) if !files.is_empty() => {
                 td.link(task_id, &files).ok();
             }

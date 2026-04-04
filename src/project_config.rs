@@ -85,6 +85,7 @@ struct ProjectConfig {
     codex: Option<CodexConfig>,
 }
 
+#[derive(Clone)]
 pub struct ProjectSettings {
     pub vcs_mode: VcsMode,
     pub auto_merge: bool,
@@ -95,6 +96,7 @@ pub struct ProjectSettings {
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
     pub auto_develop: bool,
+    #[allow(dead_code)]
     pub provider: Provider,
     pub implement_provider: Provider,
     pub review_provider: Provider,

@@ -55,9 +55,9 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         prompt::Template::Review,
         task_id,
         &ctx.project_root,
-        ctx.max_reviews,
+        ctx.settings.max_reviews,
         Some(review_cycle),
-        &ctx.base_branch,
+        &ctx.settings.base_branch,
     );
 
     let slug = ctx.project_slug();
@@ -70,7 +70,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         command_name: "review",
         project: &slug,
         task_id,
-        model: &ctx.review_model,
+        model: &ctx.settings.review_model,
     })? {
         error!("Review failed (exit code nonzero)");
         return Ok(false);
@@ -85,7 +85,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         info!("Task {task_id} already has an open proposal — skipping re-review");
     } else if task.status == "in_review" {
         // LLM approved the review
-        match ctx.vcs_mode {
+        match ctx.settings.vcs_mode {
             VcsMode::Local => handle_approved_local(ctx, &td_client, task_id, &wt_path)?,
             VcsMode::Off => handle_approved_off(&td_client, task_id)?,
             VcsMode::Auto | VcsMode::GitHub | VcsMode::GitLab => {
@@ -111,19 +111,19 @@ fn pre_review_max_reviews_exceeded(
     task_id: &str,
     review_count: u32,
 ) -> bool {
-    if review_count < ctx.max_reviews {
+    if review_count < ctx.settings.max_reviews {
         return false;
     }
     info!(
         "Task {task_id} reached max reviews ({review_count}/{})",
-        ctx.max_reviews
+        ctx.settings.max_reviews
     );
     td_client
         .comment(
             task_id,
             &format!(
                 "Orchestrator: max review cycles reached ({review_count}/{}). Needs human review.",
-                ctx.max_reviews
+                ctx.settings.max_reviews
             ),
         )
         .ok();
@@ -134,7 +134,7 @@ fn pre_review_max_reviews_exceeded(
             &format!("review cycle {review_count} completed"),
             &format!(
                 "max review cycles reached ({review_count}/{}). Needs human review.",
-                ctx.max_reviews
+                ctx.settings.max_reviews
             ),
         )
         .ok();
@@ -149,9 +149,9 @@ fn handle_approved_local(
 ) -> Result<()> {
     info!("Task {task_id} approved — performing local merge");
 
-    if !ctx.pre_merge_hooks.is_empty() {
+    if !ctx.settings.pre_merge_hooks.is_empty() {
         info!("Running pre-merge hooks in worktree");
-        if let Err(e) = vcs::run_pre_merge_hooks(wt_path, &ctx.pre_merge_hooks) {
+        if let Err(e) = vcs::run_pre_merge_hooks(wt_path, &ctx.settings.pre_merge_hooks) {
             error!("Pre-merge hook failed for {task_id}: {e:#}");
             td_client
                 .comment(
@@ -167,28 +167,28 @@ fn handle_approved_local(
     match vcs::local_merge(
         &ctx.project_root,
         task_id,
-        &ctx.target_branch,
-        ctx.merge_strategy,
+        &ctx.settings.target_branch,
+        ctx.settings.merge_strategy,
         wt_path,
     ) {
         Ok(()) => {
             td_client.approve(task_id)?;
             info!("Task {task_id} merged and approved");
-            vcs::run_post_merge_hooks(&ctx.project_root, &ctx.post_merge_hooks);
+            vcs::run_post_merge_hooks(&ctx.project_root, &ctx.settings.post_merge_hooks);
         }
         Err(e) => {
             error!("Local merge failed for {task_id}: {e:#}");
             let task = td_client.show(task_id)?;
             let new_count = bump_review_count(td_client, &task, task_id)?;
 
-            if new_count >= ctx.max_reviews {
+            if new_count >= ctx.settings.max_reviews {
                 td_client
                     .comment(
                         task_id,
                         &format!(
                             "Orchestrator: local merge failed ({new_count}/{} attempts). \
                              Needs human attention.\n\nError: {e:#}",
-                            ctx.max_reviews
+                            ctx.settings.max_reviews
                         ),
                     )
                     .ok();
@@ -200,7 +200,7 @@ fn handle_approved_local(
                         &format!(
                             "local merge failed ({new_count}/{} attempts). \
                              Needs human attention. Error: {e:#}",
-                            ctx.max_reviews
+                            ctx.settings.max_reviews
                         ),
                     )
                     .ok();
@@ -212,13 +212,16 @@ fn handle_approved_local(
                         &format!(
                             "Orchestrator: local merge failed ({new_count}/{} attempts). \
                              Rebase your changes onto `{}` and resolve conflicts.\n\nError: {e:#}",
-                            ctx.max_reviews, ctx.target_branch
+                            ctx.settings.max_reviews, ctx.settings.target_branch
                         ),
                     )
                     .ok();
                 td_client.reject(
                     task_id,
-                    &format!("Merge conflict — rebase onto {} needed", ctx.target_branch),
+                    &format!(
+                        "Merge conflict — rebase onto {} needed",
+                        ctx.settings.target_branch
+                    ),
                 )?;
                 td_client
                     .handoff(
@@ -226,13 +229,13 @@ fn handle_approved_local(
                         "review approved",
                         &format!(
                             "merge conflict — rebase onto {} needed. Error: {e:#}",
-                            ctx.target_branch
+                            ctx.settings.target_branch
                         ),
                     )
                     .ok();
                 info!(
                     "Task reopened for rebase (attempt {new_count}/{})",
-                    ctx.max_reviews
+                    ctx.settings.max_reviews
                 );
             }
         }
@@ -270,16 +273,16 @@ fn handle_rejected(
     let new_count = bump_review_count(td_client, task, task_id)?;
     info!(
         "Task rejected (review cycle {new_count}/{})",
-        ctx.max_reviews
+        ctx.settings.max_reviews
     );
 
-    if new_count >= ctx.max_reviews {
+    if new_count >= ctx.settings.max_reviews {
         td_client
             .comment(
                 task_id,
                 &format!(
                     "Orchestrator: max review cycles reached ({new_count}/{}). Needs human review.",
-                    ctx.max_reviews
+                    ctx.settings.max_reviews
                 ),
             )
             .ok();
@@ -290,7 +293,7 @@ fn handle_rejected(
                 &format!("review cycle {new_count} completed"),
                 &format!(
                     "max review cycles reached ({new_count}/{}). Needs human review.",
-                    ctx.max_reviews
+                    ctx.settings.max_reviews
                 ),
             )
             .ok();
