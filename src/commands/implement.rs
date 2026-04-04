@@ -82,6 +82,16 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         &ctx.implement_model,
     )? {
         info!("Implementation completed");
+        // Link changed files to the task (best-effort)
+        match git::changed_files(&wt_path, &ctx.base_branch) {
+            Ok(files) if !files.is_empty() => {
+                td.link(task_id, &files).ok();
+            }
+            Ok(_) => {}
+            Err(e) => {
+                warn!("Failed to get changed files for linking: {e:#}");
+            }
+        }
         // best-effort: orchestrator will pick up the task for review on next cycle if this fails
         if let Err(e) = td.review(task_id) {
             warn!("Failed to transition {task_id} to review: {e:#}");

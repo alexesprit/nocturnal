@@ -488,6 +488,15 @@ impl<'a> Td<'a> {
         self.run(&["handoff", task_id, "--done", done, "--remaining", remaining])
             .map(|_| ())
     }
+
+    /// Link changed files to a task. Best-effort — callers should use `.ok()`.
+    pub fn link(&self, task_id: &str, files: &[String]) -> Result<()> {
+        let mut args: Vec<&str> = vec!["link", task_id];
+        for file in files {
+            args.push(file.as_str());
+        }
+        self.run(&args).map(|_| ())
+    }
 }
 
 pub enum NextAction {
@@ -757,6 +766,53 @@ mod tests {
                 "build failed",
             ]
         );
+    }
+
+    // --- link ---
+
+    #[test]
+    #[cfg(unix)]
+    fn link_sends_correct_cli_args() {
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+
+        let _guard = PATH_MUTEX.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let args_file = tmp.path().join("args.txt");
+        let args_path = args_file.display().to_string();
+
+        let script = format!(
+            "#!/bin/sh\nwhile [ \"$1\" = \"-w\" ]; do shift 2; done\nprintf '%s\\n' \"$@\" > '{args_path}'\nexit 0\n",
+            args_path = args_path,
+        );
+        let script_path = tmp.path().join("td");
+        let mut f = std::fs::File::create(&script_path).unwrap();
+        f.write_all(script.as_bytes()).unwrap();
+        let mut perms = f.metadata().unwrap().permissions();
+        perms.set_mode(0o755);
+        f.set_permissions(perms).unwrap();
+
+        let project_root = tmp.path().join("project");
+        std::fs::create_dir_all(&project_root).unwrap();
+        let old_path = std::env::var("PATH").unwrap_or_default();
+        // SAFETY: PATH_MUTEX ensures no concurrent PATH mutations in this process.
+        unsafe {
+            std::env::set_var("PATH", format!("{}:{}", tmp.path().display(), old_path));
+        }
+
+        let td = Td::new(&project_root);
+        let files = vec!["src/main.rs".to_string(), "src/lib.rs".to_string()];
+        let result = td.link("td-abc123", &files);
+
+        // SAFETY: restoring PATH to previous value.
+        unsafe {
+            std::env::set_var("PATH", old_path);
+        }
+
+        assert!(result.is_ok());
+        let recorded = std::fs::read_to_string(&args_file).unwrap();
+        let args: Vec<&str> = recorded.lines().collect();
+        assert_eq!(args, vec!["link", "td-abc123", "src/main.rs", "src/lib.rs"]);
     }
 
     // --- get_next_task_id ---

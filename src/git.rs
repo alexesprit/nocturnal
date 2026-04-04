@@ -304,6 +304,47 @@ pub fn rebase_and_merge(
     merge_ff_only(project_root, target_branch, source_branch)
 }
 
+/// Return the list of files changed between the merge-base of `base_branch` and HEAD,
+/// computed inside the given worktree. Only files present in the diff are returned;
+/// untracked files are excluded.
+pub fn changed_files(wt_path: &Path, base_branch: &str) -> Result<Vec<String>> {
+    let output = Command::new("git")
+        .args(["merge-base", base_branch, "HEAD"])
+        .current_dir(wt_path)
+        .output()
+        .context("Failed to run git merge-base")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("git merge-base failed: {}", stderr.trim());
+    }
+
+    let merge_base =
+        String::from_utf8(output.stdout).context("git merge-base output was not valid UTF-8")?;
+    let merge_base = merge_base.trim();
+
+    let range = format!("{merge_base}..HEAD");
+    let diff_output = Command::new("git")
+        .args(["diff", "--name-only", &range])
+        .current_dir(wt_path)
+        .output()
+        .context("Failed to run git diff --name-only")?;
+
+    if !diff_output.status.success() {
+        let stderr = String::from_utf8_lossy(&diff_output.stderr);
+        bail!("git diff --name-only failed: {}", stderr.trim());
+    }
+
+    let stdout =
+        String::from_utf8(diff_output.stdout).context("git diff output was not valid UTF-8")?;
+
+    Ok(stdout
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
 pub fn remote_url(project_root: &Path) -> Option<String> {
     Command::new("git")
         .args(["remote", "get-url", "origin"])
