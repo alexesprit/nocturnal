@@ -2,7 +2,7 @@ use anyhow::Result;
 use tracing::{error, info};
 
 use crate::config::ProjectContext;
-use crate::{claude, git, lock, prompt, td};
+use crate::{claude, git, lock, preflight, prompt, td};
 pub fn run(ctx: &ProjectContext, task_id: Option<&str>) -> Result<()> {
     let slug = ctx.project_slug();
     let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("implement-{slug}"))?;
@@ -51,6 +51,8 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         info!("dry-run: would submit task {task_id} for review");
         return Ok(false);
     }
+
+    preflight::run_checks(ctx)?;
 
     let local_only = ctx.vcs_mode == crate::project_config::VcsMode::Local;
     let wt_path = git::ensure_worktree(&ctx.project_root, task_id, &ctx.base_branch, local_only)?;

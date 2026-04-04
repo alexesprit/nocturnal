@@ -3,6 +3,7 @@ use tracing::info;
 
 use crate::config::ProjectContext;
 use crate::lock;
+use crate::preflight;
 use crate::td::{NextAction, Td};
 use crate::usage;
 
@@ -42,6 +43,10 @@ pub(crate) fn run_inner(ctx: &ProjectContext, task_id: Option<&str>) -> Result<b
             info!("dry-run: nothing to do (no reviewable or open tasks)");
         }
         return Ok(false);
+    }
+
+    if !ctx.cfg.dry_run {
+        preflight::run_checks(ctx)?;
     }
 
     // Full flow: loop implement → review → fix → review for one task.
