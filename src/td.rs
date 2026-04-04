@@ -350,14 +350,18 @@ impl<'a> Td<'a> {
         }
 
         let stdout = String::from_utf8(output.stdout).context("td output was not valid UTF-8")?;
-        let id = stdout
-            .split_whitespace()
-            .next()
-            .map(std::string::ToString::to_string);
-        if let Some(ref task_id) = id {
-            validate_task_id(task_id)?;
+        let Some(candidate) = stdout.split_whitespace().next() else {
+            return Ok(None);
+        };
+        validate_task_id(candidate)?;
+        // Confirm the candidate is a real task ID by fetching it. td next exits 0
+        // with a human-readable message (e.g. "No open issues") when there are no
+        // tasks; the first token of that message passes validate_task_id but is not
+        // a valid ID.
+        if self.show(candidate).is_err() {
+            return Ok(None);
         }
-        Ok(id)
+        Ok(Some(candidate.to_string()))
     }
 
     pub fn get_reviewable_task_id(&self) -> Result<Option<String>> {
@@ -696,6 +700,99 @@ mod tests {
             ),
             "bug,done"
         );
+    }
+
+    // --- get_next_task_id ---
+
+    // Serialise tests that temporarily mutate PATH so they don't race.
+    #[cfg(unix)]
+    static PATH_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Write a minimal fake `td` shell script and return the temp directory.
+    /// The script responds to `next` and `show`:
+    /// - `next` prints `next_output` and exits 0
+    /// - `show <id> --json` exits 0 with a stub task JSON only if `id == valid_id`,
+    ///   otherwise exits 1
+    #[cfg(unix)]
+    fn make_fake_td(tmp: &std::path::Path, next_output: &str, valid_id: &str) {
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+        let script_path = tmp.join("td");
+        let next_out = next_output.to_string();
+        let vid = valid_id.to_string();
+        // Td::cmd() prepends "-w <path>" before the subcommand, so the script
+        // must skip those flags to find the actual subcommand and its arguments.
+        let script = format!(
+            r#"#!/bin/sh
+# skip -w <path> pairs
+while [ "$1" = "-w" ]; do shift 2; done
+case "$1" in
+  next) printf '%s\n' '{next_out}'; exit 0 ;;
+  show)
+    if [ "$2" = '{vid}' ]; then
+      printf '{{"id":"{vid}","title":"","description":"","status":"open","labels":[]}}\n'
+      exit 0
+    else
+      echo "issue not found" >&2; exit 1
+    fi
+    ;;
+  *) exit 1 ;;
+esac
+"#,
+            next_out = next_out,
+            vid = vid,
+        );
+        let mut f = std::fs::File::create(&script_path).unwrap();
+        f.write_all(script.as_bytes()).unwrap();
+        let mut perms = f.metadata().unwrap().permissions();
+        perms.set_mode(0o755);
+        f.set_permissions(perms).unwrap();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn get_next_task_id_returns_none_for_no_open_issues_message() {
+        let _guard = PATH_MUTEX.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        make_fake_td(tmp.path(), "No open issues", "td-000000");
+        let project_root = tmp.path().join("project");
+        std::fs::create_dir_all(&project_root).unwrap();
+        let old_path = std::env::var("PATH").unwrap_or_default();
+        // SAFETY: PATH_MUTEX ensures no concurrent PATH mutations in this process.
+        unsafe {
+            std::env::set_var("PATH", format!("{}:{}", tmp.path().display(), old_path));
+        }
+        let td = Td::new(&project_root);
+        let result = td.get_next_task_id();
+        // SAFETY: restoring PATH to previous value.
+        unsafe {
+            std::env::set_var("PATH", old_path);
+        }
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn get_next_task_id_returns_id_for_valid_task() {
+        let _guard = PATH_MUTEX.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        make_fake_td(tmp.path(), "td-abc123 Fix something", "td-abc123");
+        let project_root = tmp.path().join("project");
+        std::fs::create_dir_all(&project_root).unwrap();
+        let old_path = std::env::var("PATH").unwrap_or_default();
+        // SAFETY: PATH_MUTEX ensures no concurrent PATH mutations in this process.
+        unsafe {
+            std::env::set_var("PATH", format!("{}:{}", tmp.path().display(), old_path));
+        }
+        let td = Td::new(&project_root);
+        let result = td.get_next_task_id();
+        // SAFETY: restoring PATH to previous value.
+        unsafe {
+            std::env::set_var("PATH", old_path);
+        }
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("td-abc123".to_string()));
     }
 
     // --- Task deserialization ---
