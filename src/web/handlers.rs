@@ -197,7 +197,15 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
         fetch_orchestrator_status(&rotation_state_file, &log_dir, &project_paths)
     })
     .await
-    .unwrap();
+    .unwrap_or_else(|e| {
+        error!("orchestrator status join error: {e}");
+        OrchestratorStatus {
+            current_project: None,
+            next_project: None,
+            next_task: None,
+            recent_logs: Vec::new(),
+        }
+    });
 
     let tmpl = DashboardTemplate {
         title: "Dashboard".to_string(),
@@ -865,7 +873,7 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
         })
     })
     .await
-    .unwrap();
+    .unwrap_or(false);
 
     if is_running {
         return Html(
@@ -916,7 +924,7 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
     let lock_status =
         tokio::task::spawn_blocking(move || check_lock_status(&lock_dir_for_check, &slug))
             .await
-            .unwrap();
+            .unwrap_or(LockStatus::Idle);
     let project_path = entry.path.clone();
 
     if matches!(lock_status, LockStatus::Running(_)) {
