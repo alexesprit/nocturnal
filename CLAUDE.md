@@ -56,6 +56,7 @@ ls -lt ${TMPDIR}/nocturnal-logs/
 Each project can have a `.nocturnal.toml` in its root. Top-level fields:
 - `max_reviews` — max review cycles before blocking a task (default `3`)
 - `max_budget` — max USD per Claude run; omit for no budget limit (default: unlimited)
+- `auto_develop` — boolean (default `true`). When set to `false`, rotation commands (`develop-rotate`, `proposal-rotate`, `foreach`) skip the project. The web dashboard continues to show the project regardless.
 
 `[claude]` section (per-operation model config):
 - `model` — default Claude model for all operations (default `"sonnet"`)

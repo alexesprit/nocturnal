@@ -75,6 +75,7 @@ struct ProjectConfig {
     hooks: Option<HooksConfig>,
     max_reviews: Option<u32>,
     max_budget: Option<u32>,
+    auto_develop: Option<bool>,
     provider: Option<Provider>,
     claude: Option<ClaudeConfig>,
     codex: Option<CodexConfig>,
@@ -89,6 +90,7 @@ pub struct ProjectSettings {
     pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
+    pub auto_develop: bool,
     pub provider: Provider,
     pub implement_model: String,
     pub review_model: String,
@@ -176,6 +178,7 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                 merge_strategy,
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
+                auto_develop: f.auto_develop.unwrap_or(true),
                 provider,
                 implement_model,
                 review_model,
@@ -201,6 +204,7 @@ impl Default for ProjectSettings {
             merge_strategy: MergeStrategy::default(),
             max_reviews: DEFAULT_MAX_REVIEWS,
             max_budget: DEFAULT_MAX_BUDGET,
+            auto_develop: true,
             provider: Provider::default(),
             implement_model: DEFAULT_MODEL.to_string(),
             review_model: DEFAULT_MODEL.to_string(),
@@ -546,6 +550,29 @@ mod tests {
         let hooks = f.hooks.unwrap();
         assert_eq!(hooks.pre_merge.unwrap(), vec!["cargo test"]);
         assert_eq!(hooks.post_merge.unwrap(), vec!["git push"]);
+    }
+
+    #[test]
+    fn auto_develop_defaults_to_true() {
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        assert!(settings.auto_develop);
+    }
+
+    #[test]
+    fn parse_auto_develop_false() {
+        let f: ProjectConfig = toml::from_str("auto_develop = false").unwrap();
+        assert!(!f.auto_develop.unwrap());
+    }
+
+    #[test]
+    fn load_settings_auto_develop_false() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(f, "auto_develop = false\n").unwrap();
+        let settings = load_project_settings(dir.path());
+        assert!(!settings.auto_develop);
     }
 
     #[test]

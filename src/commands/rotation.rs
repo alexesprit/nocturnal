@@ -6,6 +6,7 @@ use tracing::{error, info};
 
 use crate::config::{self, Config, ProjectContext};
 use crate::lock;
+use crate::project_config::load_project_settings;
 
 pub fn rotate_projects(
     cfg: &Config,
@@ -46,6 +47,17 @@ pub fn rotate_projects(
         if !project_root.join(".todos").is_dir() {
             error!(
                 "td not initialized in {} — skipping",
+                project_root.display()
+            );
+            idx = (idx + 1) % count;
+            tried += 1;
+            continue;
+        }
+
+        let settings = load_project_settings(&project_root);
+        if !settings.auto_develop {
+            info!(
+                "Skipping {} — auto_develop is false",
                 project_root.display()
             );
             idx = (idx + 1) % count;
