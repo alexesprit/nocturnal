@@ -42,28 +42,30 @@ enum Command {
     Init,
     /// Implement and review the next open task [default]
     Develop {
+        /// Project directory (default: current directory)
+        path: Option<String>,
+        /// Run across all configured projects
+        #[arg(long)]
+        all: bool,
         /// Target a specific task ID instead of picking the next one automatically
         #[arg(long)]
         task: Option<String>,
     },
-    /// Pick and implement the highest-priority open task
-    Implement {
-        /// Target a specific task ID instead of picking the next one automatically
-        #[arg(long)]
-        task: Option<String>,
-    },
-    /// Pick and review the next reviewable task
-    Review,
     /// Check open proposals for review comments and address them
-    Proposal,
-    /// Cycle through projects and run proposal for the first project with open proposals
-    ProposalRotate,
-    /// Process one project per tick, cycling through the project list (implement+review)
-    DevelopRotate,
-    /// Run 'develop' for every project in the project list (same tick)
-    Foreach,
-    /// Run develop-rotate in a loop until nothing is left to do
+    Proposal {
+        /// Project directory (default: current directory)
+        path: Option<String>,
+        /// Run across all configured projects
+        #[arg(long)]
+        all: bool,
+    },
+    /// Run develop in a loop until nothing is left to do
     Loop {
+        /// Project directory (default: current directory)
+        path: Option<String>,
+        /// Run across all configured projects
+        #[arg(long)]
+        all: bool,
         /// Maximum number of iterations (default: unlimited)
         #[arg(long, short = 'n')]
         max_iterations: Option<usize>,
@@ -131,37 +133,58 @@ fn main() {
 fn run(cli: Cli) -> Result<()> {
     let mut cfg = config::Config::from_env();
     cfg.dry_run = cli.dry_run;
-    let command = cli.command.unwrap_or(Command::Develop { task: None });
+    let command = cli.command.unwrap_or(Command::Develop {
+        path: None,
+        all: false,
+        task: None,
+    });
 
-    let project_root = match cli.project {
+    let default_root = match cli.project {
         Some(p) => std::path::PathBuf::from(p),
         None => std::env::current_dir()?,
     };
 
     match command {
-        Command::Init => commands::init::run(&project_root, cfg.dry_run),
-        Command::DevelopRotate => commands::rotate::run(&cfg),
-        Command::Loop { max_iterations } => commands::loop_cmd::run(&cfg, max_iterations),
-        Command::ProposalRotate => commands::proposal_review_rotate::run(&cfg),
-        Command::Foreach => commands::foreach::run(&cfg),
+        Command::Init => commands::init::run(&default_root, cfg.dry_run),
         Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
-        _ => {
-            config::check_td_init(&project_root)?;
-
-            let ctx = config::ProjectContext::new(cfg, project_root);
-            match command {
-                Command::Develop { task } => commands::run::run(&ctx, task.as_deref()),
-                Command::Implement { task } => commands::implement::run(&ctx, task.as_deref()),
-                Command::Review => commands::review::run(&ctx),
-                Command::Proposal => commands::proposal_review::run(&ctx),
-                Command::Gc => commands::gc::run(&ctx),
-                Command::Init
-                | Command::DevelopRotate
-                | Command::Loop { .. }
-                | Command::ProposalRotate
-                | Command::Foreach
-                | Command::Web { .. } => unreachable!(),
+        Command::Develop { path, all, task } => {
+            if all {
+                commands::rotate::run(&cfg)
+            } else {
+                let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
+                config::check_td_init(&root)?;
+                let ctx = config::ProjectContext::new(cfg, root);
+                commands::run::run(&ctx, task.as_deref())
             }
+        }
+        Command::Proposal { path, all } => {
+            if all {
+                commands::proposal_review_rotate::run(&cfg)
+            } else {
+                let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
+                config::check_td_init(&root)?;
+                let ctx = config::ProjectContext::new(cfg, root);
+                commands::proposal_review::run(&ctx)
+            }
+        }
+        Command::Loop {
+            path,
+            all,
+            max_iterations,
+        } => {
+            if all {
+                commands::loop_cmd::run(&cfg, max_iterations)
+            } else {
+                let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
+                config::check_td_init(&root)?;
+                let ctx = config::ProjectContext::new(cfg, root);
+                commands::loop_cmd::run_single(&ctx, max_iterations)
+            }
+        }
+        Command::Gc => {
+            config::check_td_init(&default_root)?;
+            let ctx = config::ProjectContext::new(cfg, default_root);
+            commands::gc::run(&ctx)
         }
     }
 }

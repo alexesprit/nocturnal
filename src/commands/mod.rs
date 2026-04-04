@@ -1,4 +1,3 @@
-pub mod foreach;
 pub mod gc;
 pub mod implement;
 pub mod init;

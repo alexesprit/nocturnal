@@ -3,25 +3,7 @@ use tracing::{error, info};
 
 use crate::config::ProjectContext;
 use crate::project_config::VcsMode;
-use crate::{backend, git, lock, preflight, prompt, td, vcs};
-
-pub fn run(ctx: &ProjectContext) -> Result<()> {
-    let slug = ctx.project_slug();
-    let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("review-{slug}"))?;
-
-    run_unlocked(ctx)
-}
-
-fn run_unlocked(ctx: &ProjectContext) -> Result<()> {
-    let td_client = td::Td::new(&ctx.project_root);
-
-    let Some(task_id) = td_client.get_reviewable_task_id()? else {
-        info!("No reviewable tasks found");
-        return Ok(());
-    };
-
-    review_task(ctx, &task_id).map(|_| ())
-}
+use crate::{backend, git, preflight, prompt, td, vcs};
 
 /// Review a specific task. Returns Ok(true) if review completed successfully
 /// (approved, rejected, or proposal created).
