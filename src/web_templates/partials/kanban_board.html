@@ -1,97 +1,32 @@
+{%- macro kanban_col(title, css_status, issues, name) -%}
+    <div class="kanban-column">
+        <div class="kanban-column-header">
+            <span class="kanban-column-title">{{ title }}</span>
+            <span class="kanban-count badge badge-status badge-status-{{ css_status }}">{{ issues.len() }}</span>
+        </div>
+        {% if issues.is_empty() %}
+        <p class="kanban-empty">No tasks</p>
+        {% else %}
+        {% for issue in issues %}
+        <a class="kanban-card" href="/projects/{{ name }}/issues/{{ issue.id }}">
+            <div class="kanban-card-id"><code>{{ issue.id }}</code></div>
+            <div class="kanban-card-title">{{ issue.title }}</div>
+            <div class="kanban-card-meta">
+                <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
+                <span class="kanban-card-type">{{ issue.task_type }}</span>
+                {% if !issue.labels.is_empty() %}
+                <span class="kanban-card-labels">{{ issue.labels|join_labels(", ") }}</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro -%}
+
 <div class="kanban-board">
-    <div class="kanban-column">
-        <div class="kanban-column-header">
-            <span class="kanban-column-title">Open</span>
-            <span class="kanban-count badge badge-status badge-status-open">{{ open.len() }}</span>
-        </div>
-        {% if open.is_empty() %}
-        <p class="kanban-empty">No tasks</p>
-        {% else %}
-        {% for issue in open %}
-        <a class="kanban-card" href="/projects/{{ name }}/issues/{{ issue.id }}">
-            <div class="kanban-card-id"><code>{{ issue.id }}</code></div>
-            <div class="kanban-card-title">{{ issue.title }}</div>
-            <div class="kanban-card-meta">
-                <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
-                <span class="kanban-card-type">{{ issue.task_type }}</span>
-                {% if !issue.labels.is_empty() %}
-                <span class="kanban-card-labels">{{ issue.labels|join_labels(", ") }}</span>
-                {% endif %}
-            </div>
-        </a>
-        {% endfor %}
-        {% endif %}
-    </div>
-
-    <div class="kanban-column">
-        <div class="kanban-column-header">
-            <span class="kanban-column-title">In Progress</span>
-            <span class="kanban-count badge badge-status badge-status-in_progress">{{ in_progress.len() }}</span>
-        </div>
-        {% if in_progress.is_empty() %}
-        <p class="kanban-empty">No tasks</p>
-        {% else %}
-        {% for issue in in_progress %}
-        <a class="kanban-card" href="/projects/{{ name }}/issues/{{ issue.id }}">
-            <div class="kanban-card-id"><code>{{ issue.id }}</code></div>
-            <div class="kanban-card-title">{{ issue.title }}</div>
-            <div class="kanban-card-meta">
-                <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
-                <span class="kanban-card-type">{{ issue.task_type }}</span>
-                {% if !issue.labels.is_empty() %}
-                <span class="kanban-card-labels">{{ issue.labels|join_labels(", ") }}</span>
-                {% endif %}
-            </div>
-        </a>
-        {% endfor %}
-        {% endif %}
-    </div>
-
-    <div class="kanban-column">
-        <div class="kanban-column-header">
-            <span class="kanban-column-title">Blocked</span>
-            <span class="kanban-count badge badge-status badge-status-blocked">{{ blocked.len() }}</span>
-        </div>
-        {% if blocked.is_empty() %}
-        <p class="kanban-empty">No tasks</p>
-        {% else %}
-        {% for issue in blocked %}
-        <a class="kanban-card" href="/projects/{{ name }}/issues/{{ issue.id }}">
-            <div class="kanban-card-id"><code>{{ issue.id }}</code></div>
-            <div class="kanban-card-title">{{ issue.title }}</div>
-            <div class="kanban-card-meta">
-                <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
-                <span class="kanban-card-type">{{ issue.task_type }}</span>
-                {% if !issue.labels.is_empty() %}
-                <span class="kanban-card-labels">{{ issue.labels|join_labels(", ") }}</span>
-                {% endif %}
-            </div>
-        </a>
-        {% endfor %}
-        {% endif %}
-    </div>
-
-    <div class="kanban-column">
-        <div class="kanban-column-header">
-            <span class="kanban-column-title">In Review</span>
-            <span class="kanban-count badge badge-status badge-status-in_review">{{ in_review.len() }}</span>
-        </div>
-        {% if in_review.is_empty() %}
-        <p class="kanban-empty">No tasks</p>
-        {% else %}
-        {% for issue in in_review %}
-        <a class="kanban-card" href="/projects/{{ name }}/issues/{{ issue.id }}">
-            <div class="kanban-card-id"><code>{{ issue.id }}</code></div>
-            <div class="kanban-card-title">{{ issue.title }}</div>
-            <div class="kanban-card-meta">
-                <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
-                <span class="kanban-card-type">{{ issue.task_type }}</span>
-                {% if !issue.labels.is_empty() %}
-                <span class="kanban-card-labels">{{ issue.labels|join_labels(", ") }}</span>
-                {% endif %}
-            </div>
-        </a>
-        {% endfor %}
-        {% endif %}
-    </div>
+    {% call kanban_col("Open", "open", open, name) %}
+    {% call kanban_col("In Progress", "in_progress", in_progress, name) %}
+    {% call kanban_col("Blocked", "blocked", blocked, name) %}
+    {% call kanban_col("In Review", "in_review", in_review, name) %}
 </div>
