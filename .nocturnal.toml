@@ -1,5 +1,11 @@
+review_provider = "codex"
+
 [claude]
 review_model = "opus"
+
+[codex]
+model = "gpt-5.4"
+reasoning_effort = "xhigh"
 
 [vcs]
 mode = "local"
