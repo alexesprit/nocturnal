@@ -6,7 +6,9 @@
 
 ## Architecture
 
-**Key flow:** Tasks come from `td`. Each task gets an isolated git worktree (`git gtr new nocturnal/<task-id>`). Claude runs inside the worktree with `--dangerously-skip-permissions`. The orchestrator manages td lifecycle transitions (start → review → approve/reject/block).
+**Key flow:** Tasks come from `td`. Each task gets an isolated git worktree (`git gtr new nocturnal/<task-id>`). The selected AI backend runs inside the worktree. The orchestrator manages td lifecycle transitions (start → review → approve/reject/block).
+
+**Multi-backend AI support:** The `AiBackend` trait in `src/backend.rs` abstracts over AI providers. `ClaudeBackend` invokes `claude -p --dangerously-skip-permissions`; `CodexBackend` invokes `codex exec --full-auto`. The active backend is selected per project via the `provider` field in `.nocturnal.toml`.
 
 **Review cycle protection:** Tracks rejection count via `noc-reviews:N` label. After `MAX_REVIEWS` (default 3) rejections, blocks the task for human attention.
 
@@ -21,6 +23,7 @@
 - `td` — task management CLI (github.com/marcus/td), stores data in `.todos/` at project root
 - `git gtr` — git worktree runner (github.com/coderabbitai/git-worktree-runner), creates isolated worktrees
 - `claude` — Claude Code CLI, invoked with `-p` for non-interactive mode
+- `codex` — OpenAI Codex CLI (optional), used when `provider = "codex"` in `.nocturnal.toml`
 
 ## Prompt Templates
 
@@ -54,6 +57,9 @@ ls -lt ${TMPDIR}/nocturnal-logs/
 ## Per-Project Configuration
 
 Each project can have a `.nocturnal.toml` in its root. Top-level fields:
+- `provider` — AI backend: `"claude"` (default) or `"codex"`
+- `implement_provider` — override provider for implement/develop (falls back to `provider`)
+- `review_provider` — override provider for review/proposal-review (falls back to `provider`)
 - `max_reviews` — max review cycles before blocking a task (default `3`)
 - `max_budget` — max USD per Claude run; omit for no budget limit (default: unlimited)
 - `auto_develop` — boolean (default `true`). When set to `false`, rotation commands (`develop-rotate`, `proposal-rotate`, `foreach`) skip the project. The web dashboard continues to show the project regardless.
@@ -62,6 +68,12 @@ Each project can have a `.nocturnal.toml` in its root. Top-level fields:
 - `model` — default Claude model for all operations (default `"sonnet"`)
 - `implement_model` — override model for implement/develop (falls back to `model`)
 - `review_model` — override model for review/proposal-review (falls back to `model`)
+
+`[codex]` section (used when `provider = "codex"`):
+- `model` — default Codex model (default `"gpt-5.4"`)
+- `implement_model` — override model for implement/develop (falls back to `model`)
+- `review_model` — override model for review/proposal-review (falls back to `model`)
+- `reasoning_effort` — Codex reasoning effort level (default `"high"`)
 
 `[vcs]` section:
 - `mode` — VCS integration mode: `"auto"`, `"github"`, `"gitlab"`, `"local"`, or `"off"` (default). `"local"` merges directly into the configured target branch after internal review passes.

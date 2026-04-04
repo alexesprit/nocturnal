@@ -47,6 +47,7 @@ Tasks that fail review after multiple cycles are blocked for human attention.
 - [git-worktree-runner](https://github.com/coderabbitai/git-worktree-runner) (`git gtr`) — isolated worktree creation
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude`) — AI coding agent
 - [glab](https://gitlab.com/gitlab-org/cli) (GitLab) or [gh](https://cli.github.com/) (GitHub) — optional, for proposal creation
+- [Codex CLI](https://github.com/openai/codex) (`codex`) — optional, alternative AI backend
 
 ## Installation
 
@@ -54,9 +55,19 @@ Tasks that fail review after multiple cycles are blocked for human attention.
 cargo install --path .
 ```
 
-The target repository must have `td` initialized (`td init`).
+Then bootstrap a project with `nocturnal init` (see [Usage](#usage)).
 
 ## Usage
+
+### Initialize a Project
+
+```bash
+cd /path/to/repo
+nocturnal init           # check tools, run td init, create .nocturnal.toml
+nocturnal init --dry-run # preview without making changes
+```
+
+`init` checks for required tools (`td`, `git`, `claude`, `git-gtr`) and optional VCS tools (`gh`/`glab`) based on the detected git remote. It runs `td init` if needed, creates `.nocturnal.toml` with sensible defaults, and creates the `.nocturnal/` prompt extras directory.
 
 ### Single Project
 
@@ -67,6 +78,10 @@ nocturnal develop
 
 # Or specify the project explicitly
 nocturnal --project /path/to/repo develop
+
+# Target a specific task
+nocturnal develop --task td-abc123
+nocturnal implement --task td-abc123
 
 # Run a specific phase
 nocturnal implement  # Pick and implement the next open task
@@ -239,6 +254,9 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
 Each project can have a `.nocturnal.toml` in its root:
 
 ```toml
+# AI backend: "claude" (default) or "codex"
+provider = "claude"
+
 # Max review cycles before blocking a task for human attention (default: 3)
 max_reviews = 3
 
@@ -255,6 +273,19 @@ implement_model = "opus"
 # Override model for review/proposal-review operations (optional, falls back to model)
 review_model = "haiku"
 
+[codex]
+# Default Codex model (default: "gpt-5.4")
+model = "gpt-5.4"
+
+# Override model for implement/develop operations (optional, falls back to model)
+implement_model = "o4-mini"
+
+# Override model for review/proposal-review operations (optional, falls back to model)
+review_model = "o3-mini"
+
+# Reasoning effort level (default: "high")
+reasoning_effort = "high"
+
 [vcs]
 # "auto"   — detect GitLab/GitHub from origin remote URL
 # "github" — force GitHub
@@ -263,7 +294,10 @@ review_model = "haiku"
 # "off"    — no proposals (default if section is missing)
 mode = "auto"
 
-# Target branch for proposals or local merges (default: "main")
+# Branch worktrees are created from (default: "main")
+base_branch = "main"
+
+# Target branch for proposals or local merges (default: same as base_branch)
 target_branch = "main"
 
 # Local merge strategy: "ff", "no-ff", or "rebase"
@@ -274,6 +308,9 @@ merge_strategy = "rebase"
 # Set to false if your repo has no branch protection rules,
 # otherwise the PR/MR will be merged immediately on creation.
 auto_merge = false
+
+# Delete the remote branch after a proposal is merged (default: false)
+delete_branch_on_merge = false
 ```
 
 ## Task Lifecycle
