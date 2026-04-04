@@ -41,8 +41,6 @@ pub struct Task {
     pub priority: String,
     #[serde(rename = "type", default, deserialize_with = "null_as_default")]
     pub task_type: String,
-    #[serde(default)]
-    pub points: Option<i32>,
     #[serde(default, deserialize_with = "null_as_default")]
     pub sprint: String,
     #[serde(default, deserialize_with = "null_as_default")]
@@ -70,8 +68,6 @@ pub struct IssueDetail {
     pub issue_type: String,
     #[serde(default, deserialize_with = "null_as_default")]
     pub labels: Vec<String>,
-    #[serde(default)]
-    pub points: Option<i32>,
     #[serde(default, deserialize_with = "null_as_default")]
     pub sprint: String,
     #[serde(default, deserialize_with = "null_as_default")]
@@ -594,7 +590,6 @@ mod tests {
             labels: labels.iter().map(|s| (*s).to_string()).collect(),
             priority: String::new(),
             task_type: String::new(),
-            points: None,
             sprint: String::new(),
             created_at: String::new(),
             updated_at: String::new(),

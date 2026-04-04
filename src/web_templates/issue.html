@@ -27,10 +27,6 @@
 <section>
     <h2>Metadata</h2>
     <dl>
-        {% if let Some(points) = issue.points %}
-        <dt>Points</dt>
-        <dd>{{ points }}</dd>
-        {% endif %}
         {% if !issue.labels.is_empty() %}
         <dt>Labels</dt>
         <dd>{{ issue.labels|join_labels(", ") }}</dd>
