@@ -63,15 +63,15 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     let slug = ctx.project_slug();
     let log_file = backend::log_path(&ctx.cfg.log_dir, "review", task_id);
 
-    if !ctx.review_backend.run(
-        &wt_path,
-        &rendered,
-        &log_file,
-        "review",
-        &slug,
+    if !ctx.review_backend.run(&backend::RunParams {
+        wt_path: &wt_path,
+        prompt: &rendered,
+        log_file: &log_file,
+        command_name: "review",
+        project: &slug,
         task_id,
-        &ctx.review_model,
-    )? {
+        model: &ctx.review_model,
+    })? {
         error!("Review failed (exit code nonzero)");
         return Ok(false);
     }

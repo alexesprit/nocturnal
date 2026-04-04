@@ -159,15 +159,15 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
         let slug = ctx.project_slug();
         let log_file = backend::log_path(&ctx.cfg.log_dir, "proposal", &task_id);
 
-        if ctx.review_backend.run(
-            &wt_path,
-            &rendered,
-            &log_file,
-            "proposal",
-            &slug,
-            &task_id,
-            &ctx.review_model,
-        )? {
+        if ctx.review_backend.run(&backend::RunParams {
+            wt_path: &wt_path,
+            prompt: &rendered,
+            log_file: &log_file,
+            command_name: "proposal",
+            project: &slug,
+            task_id: &task_id,
+            model: &ctx.review_model,
+        })? {
             info!("Proposal review completed");
         } else {
             error!("Proposal review failed");

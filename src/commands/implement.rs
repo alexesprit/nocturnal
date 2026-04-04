@@ -72,15 +72,15 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     let slug = ctx.project_slug();
     let log_file = backend::log_path(&ctx.cfg.log_dir, "implement", task_id);
 
-    if ctx.implement_backend.run(
-        &wt_path,
-        &rendered,
-        &log_file,
-        "implement",
-        &slug,
+    if ctx.implement_backend.run(&backend::RunParams {
+        wt_path: &wt_path,
+        prompt: &rendered,
+        log_file: &log_file,
+        command_name: "implement",
+        project: &slug,
         task_id,
-        &ctx.implement_model,
-    )? {
+        model: &ctx.implement_model,
+    })? {
         info!("Implementation completed");
         // Link changed files to the task (best-effort)
         match git::changed_files(&wt_path, &ctx.base_branch) {

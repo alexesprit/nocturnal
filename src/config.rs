@@ -43,11 +43,9 @@ impl ProjectContext {
         let make_backend = |provider: Provider| -> Arc<dyn AiBackend> {
             match provider {
                 Provider::Claude => Arc::new(ClaudeBackend {
-                    log_dir: cfg.log_dir.clone(),
                     max_budget: settings.max_budget,
                 }),
                 Provider::Codex => Arc::new(CodexBackend {
-                    log_dir: cfg.log_dir.clone(),
                     max_budget: settings.max_budget,
                     reasoning_effort: settings.codex_reasoning_effort.clone(),
                 }),
