@@ -30,16 +30,16 @@ pub(super) const MAX_QUERY_LEN: usize = 200;
 
 // --- Inline feedback HTML ---
 
-pub(super) const FEEDBACK_HTML_ROTATE_RUNNING: &str = r#"<span class="rotate-feedback rotate-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('rotate-feedback');if(f)f.innerHTML='';},4000);</script>"#;
+pub(super) const FEEDBACK_HTML_ROTATE_RUNNING: &str = r#"<span class="action-feedback action-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
 
-pub(super) const FEEDBACK_HTML_ROTATE_TRIGGERED: &str = r#"<span class="rotate-feedback rotate-feedback-ok">Rotation triggered</span><script>setTimeout(function(){var f=document.getElementById('rotate-feedback');if(f)f.innerHTML='';},4000);</script>"#;
+pub(super) const FEEDBACK_HTML_ROTATE_TRIGGERED: &str = r#"<span class="action-feedback action-feedback-ok">Rotation triggered</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
 
-pub(super) const FEEDBACK_HTML_DEVELOP_RUNNING: &str = r#"<span class="rotate-feedback rotate-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('develop-feedback');if(f)f.innerHTML='';},4000);</script>"#;
+pub(super) const FEEDBACK_HTML_DEVELOP_RUNNING: &str = r#"<span class="action-feedback action-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
 
-pub(super) const FEEDBACK_HTML_DEVELOP_TRIGGERED: &str = r#"<span class="rotate-feedback rotate-feedback-ok">Develop triggered</span><script>setTimeout(function(){var f=document.getElementById('develop-feedback');if(f)f.innerHTML='';},4000);</script>"#;
+pub(super) const FEEDBACK_HTML_DEVELOP_TRIGGERED: &str = r#"<span class="action-feedback action-feedback-ok">Develop triggered</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
 
 pub(super) const FEEDBACK_HTML_FAILED_TO_START: &str =
-    r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#;
+    r#"<span class="action-feedback action-feedback-error">Failed to start</span>"#;
 
 // --- Validation helpers ---
 

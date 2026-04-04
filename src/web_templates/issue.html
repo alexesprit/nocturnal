@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<header class="issue-header">
+<header>
     <h1>{{ issue.title }}</h1>
-    <p class="issue-meta">
+    <p>
         <code>{{ issue.id }}</code><button class="copy-btn" data-copy="{{ issue.id }}" type="button" aria-label="Copy task ID"><i data-lucide="copy" class="copy-icon"></i><i data-lucide="check" class="copy-check"></i></button>
         <span class="badge badge-status badge-status-{{ issue.status }}">{{ issue.status }}</span>
         <span class="priority-select-wrapper badge badge-priority badge-priority-{{ issue.priority }}" id="priority-select-{{ issue.id }}">
@@ -24,9 +24,9 @@
         <span>{{ issue.issue_type }}</span>
     </p>
 </header>
-<section class="issue-section">
+<section>
     <h2>Metadata</h2>
-    <dl class="metadata-dl">
+    <dl>
         {% if !issue.labels.is_empty() %}
         <dt>Labels</dt>
         <dd>{{ issue.labels|join_labels(", ") }}</dd>
@@ -72,7 +72,7 @@
     </dl>
 </section>
 {% if !issue.description.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Description</h2>
     <div class="markdown">
         {{ issue.description|render_markdown|safe }}
@@ -80,7 +80,7 @@
 </section>
 {% endif %}
 {% if !issue.acceptance.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Acceptance Criteria</h2>
     <div class="markdown">
         {{ issue.acceptance|render_markdown|safe }}
@@ -88,7 +88,7 @@
 </section>
 {% endif %}
 {% if !issue.parent_id.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Parent</h2>
     <p>
         <a href="/projects/{{ project_name }}/issues/{{ issue.parent_id }}">
@@ -98,9 +98,9 @@
 </section>
 {% endif %}
 {% if !issue.children.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Children</h2>
-    <ul class="relation-list">
+    <ul>
         {% for child in issue.children %}
         <li>
             <a href="/projects/{{ project_name }}/issues/{{ child.id }}">
@@ -114,9 +114,9 @@
 </section>
 {% endif %}
 {% if !issue.depends_on.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Depends On</h2>
-    <ul class="relation-list">
+    <ul>
         {% for dep in issue.depends_on %}
         <li>
             <a href="/projects/{{ project_name }}/issues/{{ dep }}">
@@ -128,9 +128,9 @@
 </section>
 {% endif %}
 {% if !issue.blocked_by.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Blocked By</h2>
-    <ul class="relation-list">
+    <ul>
         {% for blocker in issue.blocked_by %}
         <li>
             <a href="/projects/{{ project_name }}/issues/{{ blocker }}">
@@ -142,11 +142,11 @@
 </section>
 {% endif %}
 {% if !issue.comments.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Comments</h2>
     {% for comment in issue.comments %}
-    <article class="comment">
-        <header class="comment-header">
+    <article>
+        <header>
             <strong>{{ comment.author }}</strong>
             <small>{{ comment.created|format_datetime }}</small>
         </header>
@@ -158,7 +158,7 @@
 </section>
 {% endif %}
 {% if !issue.activity.is_empty() %}
-<section class="issue-section">
+<section>
     <h2>Activity</h2>
     <table>
         <thead>

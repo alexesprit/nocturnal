@@ -55,7 +55,7 @@
             hx-target="#content-panel"
             hx-swap="innerHTML"
             aria-label="Table view"
-        >Table</button>
+        ><i data-lucide="list" class="icon-inline"></i>Table</button>
         <button
             class="view-btn{% if view == "kanban" %} view-btn-active{% endif %}"
             onclick="nocSetView(this, 'kanban')"
@@ -64,7 +64,7 @@
             hx-target="#content-panel"
             hx-swap="innerHTML"
             aria-label="Kanban view"
-        >Kanban</button>
+        ><i data-lucide="columns-3" class="icon-inline"></i>Kanban</button>
     </div>
 </div>
 <script>

@@ -76,6 +76,8 @@ pub(super) struct IssueTableErrorTemplate {
     pub(super) error_msg: String,
 }
 
+// ── Shared filters ──────────────────────────────────────────────────
+
 mod filters {
     pub use crate::web::filters::{format_date, format_datetime};
 

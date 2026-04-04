@@ -91,14 +91,12 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
         }
     });
 
-    let tmpl = DashboardTemplate {
+    into_html_response(DashboardTemplate {
         title: "Dashboard".to_string(),
         breadcrumbs: vec![],
         projects,
         orchestrator,
-    };
-
-    into_html_response(tmpl)
+    })
 }
 
 pub async fn project(
@@ -146,7 +144,7 @@ pub async fn project(
             } else {
                 (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
             };
-            let tmpl = ProjectTemplate {
+            into_html_response(ProjectTemplate {
                 title: name.clone(),
                 breadcrumbs: vec![Breadcrumb {
                     label: name.clone(),
@@ -160,20 +158,18 @@ pub async fn project(
                 blocked,
                 in_review,
                 recently_closed,
-            };
-            into_html_response(tmpl)
+            })
         }
         Ok(Err(e)) => {
             warn!("td list failed for {project_name}: {e}");
-            let tmpl = ProjectErrorTemplate {
+            into_html_response(ProjectErrorTemplate {
                 title: project_name.clone(),
                 breadcrumbs: vec![Breadcrumb {
                     label: project_name.clone(),
                     url: None,
                 }],
                 error_msg: e.to_string(),
-            };
-            into_html_response(tmpl)
+            })
         }
         Err(e) => {
             error!("task join error: {e}");
@@ -235,17 +231,15 @@ pub async fn project_issues(
                 if is_htmx {
                     if view == "kanban" {
                         let (open, in_progress, blocked, in_review) = group_by_status(issues);
-                        let tmpl = KanbanBoardTemplate {
+                        into_html_response(KanbanBoardTemplate {
                             name,
                             open,
                             in_progress,
                             blocked,
                             in_review,
-                        };
-                        into_html_response(tmpl)
+                        })
                     } else {
-                        let tmpl = TableWrapperTemplate { name, issues };
-                        into_html_response(tmpl)
+                        into_html_response(TableWrapperTemplate { name, issues })
                     }
                 } else {
                     let recently_closed = tokio::task::spawn_blocking(move || {
@@ -270,7 +264,7 @@ pub async fn project_issues(
                     } else {
                         (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
                     };
-                    let tmpl = ProjectTemplate {
+                    into_html_response(ProjectTemplate {
                         title: name.clone(),
                         breadcrumbs: vec![Breadcrumb {
                             label: name.clone(),
@@ -284,27 +278,24 @@ pub async fn project_issues(
                         blocked,
                         in_review,
                         recently_closed,
-                    };
-                    into_html_response(tmpl)
+                    })
                 }
             }
             Ok(Err(e)) => {
                 warn!("td list failed for {project_name}: {e}");
                 if is_htmx {
-                    let tmpl = IssueTableErrorTemplate {
+                    into_html_response(IssueTableErrorTemplate {
                         error_msg: e.to_string(),
-                    };
-                    into_html_response(tmpl)
+                    })
                 } else {
-                    let tmpl = ProjectErrorTemplate {
+                    into_html_response(ProjectErrorTemplate {
                         title: project_name.clone(),
                         breadcrumbs: vec![Breadcrumb {
                             label: project_name.clone(),
                             url: None,
                         }],
                         error_msg: e.to_string(),
-                    };
-                    into_html_response(tmpl)
+                    })
                 }
             }
             Err(e) => {
@@ -351,25 +342,22 @@ pub async fn issue(
     .await;
 
     match result {
-        Ok(Ok((detail, noc_state))) => {
-            let tmpl = IssueTemplate {
-                title: format!("{} — {}", detail.id, detail.title),
-                breadcrumbs: vec![
-                    Breadcrumb {
-                        label: project_name.clone(),
-                        url: Some(format!("/projects/{project_name}")),
-                    },
-                    Breadcrumb {
-                        label: id,
-                        url: None,
-                    },
-                ],
-                project_name,
-                issue: detail,
-                noc_state,
-            };
-            into_html_response(tmpl)
-        }
+        Ok(Ok((detail, noc_state))) => into_html_response(IssueTemplate {
+            title: format!("{} — {}", detail.id, detail.title),
+            breadcrumbs: vec![
+                Breadcrumb {
+                    label: project_name.clone(),
+                    url: Some(format!("/projects/{project_name}")),
+                },
+                Breadcrumb {
+                    label: id,
+                    url: None,
+                },
+            ],
+            project_name,
+            issue: detail,
+            noc_state,
+        }),
         Ok(Err(e)) => {
             let err_str = e.to_string();
             if err_str.to_lowercase().contains("not found") {

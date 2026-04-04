@@ -1,54 +1,29 @@
 {% extends "layout.html" %}
 
+{% block header_actions %}
+    <button class="btn-action"
+            hx-post="/api/rotate"
+            hx-target="#action-feedback"
+            hx-swap="innerHTML">
+        <i data-lucide="refresh-cw" class="icon-inline"></i>Rotate now
+    </button>
+    <span id="action-feedback" class="action-feedback"></span>
+{% endblock %}
+
 {% block content %}
-<h1 class="page-title">Projects</h1>
 <section class="orchestrator-status">
-    <div class="orchestrator-header">
-        <h2>Orchestrator</h2>
-        <div class="rotate-controls">
-            <button class="btn-rotate"
-                    hx-post="/api/rotate"
-                    hx-target="#rotate-feedback"
-                    hx-swap="innerHTML">Rotate now</button>
-            <span id="rotate-feedback"></span>
-        </div>
-    </div>
+    <h2>Status</h2>
     <dl class="orchestrator-dl">
         <dt>Last Project</dt>
-        <dd>{% if let Some(current) = orchestrator.current_project %}<a href="/projects/{{ current }}">{{ current }}</a>{% else %}-{% endif %}</dd>
+        <dd>{% if let Some(current) = orchestrator.current_project %}<a href="/projects/{{ current }}">{{ current }}</a>{% else %}<span class="text-placeholder">--</span>{% endif %}</dd>
         <dt>Next Project</dt>
-        <dd>{% if let Some(next) = orchestrator.next_project %}<a href="/projects/{{ next }}">{{ next }}</a>{% else %}-{% endif %}</dd>
+        <dd>{% if let Some(next) = orchestrator.next_project %}<a href="/projects/{{ next }}">{{ next }}</a>{% else %}<span class="text-placeholder">--</span>{% endif %}</dd>
         <dt>Next Action</dt>
-        <dd class="next-task-dd">{% if let Some(task) = orchestrator.next_task %}{{ task.action }}: <a href="/projects/{{ orchestrator.next_project.as_ref().unwrap() }}/issues/{{ task.id }}"><code>{{ task.id }}</code></a> <span class="next-task-title">{{ task.title }}</span>{% if !task.priority.is_empty() %} <span class="badge badge-priority badge-priority-{{ task.priority }}">{{ task.priority }}</span>{% endif %}{% else %}-{% endif %}</dd>
+        <dd class="next-task-dd">{% if let Some(task) = orchestrator.next_task %}{{ task.action }}: <a href="/projects/{{ orchestrator.next_project.as_ref().unwrap() }}/issues/{{ task.id }}"><code>{{ task.id }}</code></a> <span class="next-task-title">{{ task.title }}</span>{% if !task.priority.is_empty() %} <span class="badge badge-priority badge-priority-{{ task.priority }}">{{ task.priority }}</span>{% endif %}{% else %}<span class="text-placeholder">--</span>{% endif %}</dd>
     </dl>
-    {% if !orchestrator.recent_logs.is_empty() %}
-    <h3>Recent Activity</h3>
-    <table class="recent-logs-table">
-        <thead>
-            <tr>
-                <th>Command</th>
-                <th>Project</th>
-                <th>Task</th>
-                <th>Started</th>
-                <th>Duration</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for entry in orchestrator.recent_logs %}
-            <tr{% if !entry.project.is_empty() && !entry.task_id.is_empty() %} data-href="/projects/{{ entry.project }}/issues/{{ entry.task_id }}" tabindex="0" role="link"{% endif %}>
-                <td>{{ entry.command }}</td>
-                <td>{% if !entry.project.is_empty() %}<a href="/projects/{{ entry.project }}">{{ entry.project }}</a>{% endif %}</td>
-                <td><code>{{ entry.task_id }}</code></td>
-                <td>{{ entry.started }}</td>
-                <td>{{ entry.duration }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
 </section>
 {% if projects.is_empty() %}
-<p>No projects configured.</p>
+<p class="empty-state" style="padding:3rem 0">No projects configured.</p>
 {% else %}
 <div class="project-grid">
     {% for project in projects %}
@@ -111,5 +86,32 @@
     </article>
     {% endfor %}
 </div>
+{% endif %}
+{% if !orchestrator.recent_logs.is_empty() %}
+<section class="recent-activity">
+    <h2>Recent Activity</h2>
+    <table class="recent-logs-table">
+        <thead>
+            <tr>
+                <th>Command</th>
+                <th>Project</th>
+                <th>Task</th>
+                <th>Started</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in orchestrator.recent_logs %}
+            <tr{% if !entry.project.is_empty() && !entry.task_id.is_empty() %} data-href="/projects/{{ entry.project }}/issues/{{ entry.task_id }}" tabindex="0" role="link"{% endif %}>
+                <td>{{ entry.command }}</td>
+                <td>{% if !entry.project.is_empty() %}<a href="/projects/{{ entry.project }}">{{ entry.project }}</a>{% endif %}</td>
+                <td><code>{{ entry.task_id }}</code></td>
+                <td>{{ entry.started }}</td>
+                <td>{{ entry.duration }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
 {% endif %}
 {% endblock %}

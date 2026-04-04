@@ -5,23 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} — nocturnal</title>
     <link rel="stylesheet" href="/static/css/styles.css">
-    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+    <script src="/static/js/htmx.min.js"></script>
     <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <script>
         (function() {
             var t = localStorage.getItem("theme");
             if (t === "light" || t === "dark") {
                 document.documentElement.setAttribute("data-theme", t);
-            } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
-                document.documentElement.setAttribute("data-theme", "light");
+            } else {
+                document.documentElement.setAttribute("data-theme",
+                    window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
             }
         })();
     </script>
 </head>
 <body>
     <a href="#main-content" class="sr-only">Skip to main content</a>
-    <header class="site-header">
-        <nav class="site-nav" aria-label="Breadcrumb">
+    <header>
+        <nav aria-label="Breadcrumb">
             <a href="/">nocturnal</a>
             {% for crumb in breadcrumbs %}
             <span class="separator">/</span>
@@ -31,6 +32,9 @@
             <span>{{ crumb.label }}</span>
             {% endif %}
             {% endfor %}
+            <div class="header-actions">
+                {% block header_actions %}{% endblock %}
+            </div>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">
                 <i data-lucide="sun" id="theme-icon-sun"></i>
                 <i data-lucide="moon" id="theme-icon-moon"></i>
@@ -63,34 +67,18 @@
             var iconMoon = document.getElementById("theme-icon-moon");
             var iconSystem = document.getElementById("theme-icon-system");
             var btn = document.getElementById("theme-toggle");
-            var mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)");
-            var mqListener = null;
 
             function current() {
                 return localStorage.getItem("theme") || "system";
             }
 
-            function applySystemTheme() {
-                if (mq && mq.matches) {
-                    document.documentElement.setAttribute("data-theme", "light");
-                } else {
-                    document.documentElement.removeAttribute("data-theme");
-                }
+            function resolveTheme(mode) {
+                if (mode === "light" || mode === "dark") return mode;
+                return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
             }
 
             function apply(mode) {
-                if (mode === "light" || mode === "dark") {
-                    document.documentElement.setAttribute("data-theme", mode);
-                } else {
-                    applySystemTheme();
-                }
-                if (mode === "system" && mq && !mqListener) {
-                    mqListener = function() { applySystemTheme(); };
-                    mq.addEventListener("change", mqListener);
-                } else if (mode !== "system" && mqListener) {
-                    mq.removeEventListener("change", mqListener);
-                    mqListener = null;
-                }
+                document.documentElement.setAttribute("data-theme", resolveTheme(mode));
                 localStorage.setItem("theme", mode);
                 iconSun.style.display = mode === "light" ? "block" : "none";
                 iconMoon.style.display = mode === "dark" ? "block" : "none";
@@ -103,6 +91,10 @@
             btn.addEventListener("click", function() {
                 var i = modes.indexOf(current());
                 apply(modes[(i + 1) % modes.length]);
+            });
+
+            window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", function() {
+                if (current() === "system") apply("system");
             });
         })();
     </script>

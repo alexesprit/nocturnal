@@ -1,13 +1,16 @@
 {% extends "layout.html" %}
 
-{% block content %}
-<div class="rotate-controls">
-    <button class="btn-rotate"
+{% block header_actions %}
+    <button class="btn-action"
             hx-post="/api/projects/{{ name }}/develop"
-            hx-target="#develop-feedback"
-            hx-swap="innerHTML">Develop now</button>
-    <span id="develop-feedback"></span>
-</div>
+            hx-target="#action-feedback"
+            hx-swap="innerHTML">
+        <i data-lucide="play" class="icon-inline"></i>Develop now
+    </button>
+    <span id="action-feedback" class="action-feedback"></span>
+{% endblock %}
+
+{% block content %}
 {% include "partials/filters.html" %}
 <div id="content-panel">
 {% if view == "kanban" %}
@@ -19,7 +22,7 @@
 {% if !recently_closed.is_empty() %}
 <section class="recently-closed">
     <h2>Recently Closed</h2>
-    <table class="issue-table">
+    <table>
         <thead>
             <tr>
                 <th>ID</th>
