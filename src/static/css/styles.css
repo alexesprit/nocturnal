@@ -554,10 +554,17 @@ td a:hover {
   color: var(--accent);
 }
 
+td code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--bg-tertiary);
+  padding: 0.1em 0.3em;
+  border: 1px solid var(--border);
+}
+
 /* ============================================
    Issue Detail Page
    ============================================ */
-
 
 /* Issue header */
 .issue-header {
@@ -954,14 +961,6 @@ pre {
   text-overflow: ellipsis;
   min-width: 0;
   flex: 1;
-}
-
-td code {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  background: var(--bg-tertiary);
-  padding: 0.1em 0.3em;
-  border: 1px solid var(--border);
 }
 
 /* ============================================
