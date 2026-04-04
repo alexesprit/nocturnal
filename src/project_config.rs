@@ -105,6 +105,33 @@ pub struct ProjectSettings {
     pub post_merge_hooks: Vec<String>,
 }
 
+fn resolve_model(
+    provider: Provider,
+    claude: Option<&ClaudeConfig>,
+    codex: Option<&CodexConfig>,
+    claude_picker: impl Fn(&ClaudeConfig) -> &Option<String>,
+    codex_picker: impl Fn(&CodexConfig) -> &Option<String>,
+) -> String {
+    match provider {
+        Provider::Codex => {
+            let default = codex
+                .and_then(|c| c.model.as_deref())
+                .unwrap_or(DEFAULT_CODEX_MODEL);
+            codex
+                .and_then(|c| codex_picker(c).clone())
+                .unwrap_or_else(|| default.to_string())
+        }
+        Provider::Claude => {
+            let default = claude
+                .and_then(|c| c.model.as_deref())
+                .unwrap_or(DEFAULT_MODEL);
+            claude
+                .and_then(|c| claude_picker(c).clone())
+                .unwrap_or_else(|| default.to_string())
+        }
+    }
+}
+
 fn resolve_merge_strategy(vcs: &VcsConfig) -> MergeStrategy {
     vcs.merge_strategy
         .unwrap_or_else(|| match vcs.mode.unwrap_or_default() {
@@ -132,54 +159,20 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
             let implement_provider = f.implement_provider.unwrap_or(provider);
             let review_provider = f.review_provider.unwrap_or(provider);
 
-            let implement_model = match implement_provider {
-                Provider::Codex => {
-                    let default_model = f
-                        .codex
-                        .as_ref()
-                        .and_then(|c| c.model.as_deref())
-                        .unwrap_or(DEFAULT_CODEX_MODEL);
-                    f.codex
-                        .as_ref()
-                        .and_then(|c| c.implement_model.clone())
-                        .unwrap_or_else(|| default_model.to_string())
-                }
-                Provider::Claude => {
-                    let default_model = f
-                        .claude
-                        .as_ref()
-                        .and_then(|c| c.model.as_deref())
-                        .unwrap_or(DEFAULT_MODEL);
-                    f.claude
-                        .as_ref()
-                        .and_then(|c| c.implement_model.clone())
-                        .unwrap_or_else(|| default_model.to_string())
-                }
-            };
-            let review_model = match review_provider {
-                Provider::Codex => {
-                    let default_model = f
-                        .codex
-                        .as_ref()
-                        .and_then(|c| c.model.as_deref())
-                        .unwrap_or(DEFAULT_CODEX_MODEL);
-                    f.codex
-                        .as_ref()
-                        .and_then(|c| c.review_model.clone())
-                        .unwrap_or_else(|| default_model.to_string())
-                }
-                Provider::Claude => {
-                    let default_model = f
-                        .claude
-                        .as_ref()
-                        .and_then(|c| c.model.as_deref())
-                        .unwrap_or(DEFAULT_MODEL);
-                    f.claude
-                        .as_ref()
-                        .and_then(|c| c.review_model.clone())
-                        .unwrap_or_else(|| default_model.to_string())
-                }
-            };
+            let implement_model = resolve_model(
+                implement_provider,
+                f.claude.as_ref(),
+                f.codex.as_ref(),
+                |c| &c.implement_model,
+                |c| &c.implement_model,
+            );
+            let review_model = resolve_model(
+                review_provider,
+                f.claude.as_ref(),
+                f.codex.as_ref(),
+                |c| &c.review_model,
+                |c| &c.review_model,
+            );
             let codex_reasoning_effort = f
                 .codex
                 .as_ref()
