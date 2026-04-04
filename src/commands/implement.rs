@@ -2,7 +2,7 @@ use anyhow::Result;
 use tracing::{error, info, warn};
 
 use crate::config::ProjectContext;
-use crate::{claude, git, lock, preflight, prompt, td};
+use crate::{backend, git, lock, preflight, prompt, td};
 pub fn run(ctx: &ProjectContext, task_id: Option<&str>) -> Result<()> {
     let slug = ctx.project_slug();
     let _lock = lock::Lock::acquire(&ctx.cfg.lock_dir, &format!("implement-{slug}"))?;
@@ -70,7 +70,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     );
 
     let slug = ctx.project_slug();
-    let log_file = claude::log_path(&ctx.cfg.log_dir, "implement", task_id);
+    let log_file = backend::log_path(&ctx.cfg.log_dir, "implement", task_id);
 
     if ctx.implement_backend.run(
         &wt_path,

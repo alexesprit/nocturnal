@@ -3,7 +3,7 @@ use tracing::{error, info};
 
 use crate::config::ProjectContext;
 use crate::project_config::VcsMode;
-use crate::{claude, git, lock, preflight, prompt, td, vcs};
+use crate::{backend, git, lock, preflight, prompt, td, vcs};
 
 pub fn run(ctx: &ProjectContext) -> Result<()> {
     let slug = ctx.project_slug();
@@ -87,7 +87,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     );
 
     let slug = ctx.project_slug();
-    let log_file = claude::log_path(&ctx.cfg.log_dir, "review", task_id);
+    let log_file = backend::log_path(&ctx.cfg.log_dir, "review", task_id);
 
     if !ctx.review_backend.run(
         &wt_path,

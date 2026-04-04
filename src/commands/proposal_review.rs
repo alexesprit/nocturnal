@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use tracing::{error, info};
 
 use crate::config::ProjectContext;
-use crate::{claude, git, lock, prompt, td, vcs};
+use crate::{backend, git, lock, prompt, td, vcs};
 
 /// How long to wait after creating a PR/MR before enabling auto-merge.
 ///
@@ -157,7 +157,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
         );
 
         let slug = ctx.project_slug();
-        let log_file = claude::log_path(&ctx.cfg.log_dir, "proposal", &task_id);
+        let log_file = backend::log_path(&ctx.cfg.log_dir, "proposal", &task_id);
 
         if ctx.review_backend.run(
             &wt_path,

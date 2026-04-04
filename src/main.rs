@@ -1,6 +1,5 @@
 mod activity;
 mod backend;
-mod claude;
 mod commands;
 mod config;
 mod git;
