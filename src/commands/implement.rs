@@ -90,10 +90,16 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         Ok(true)
     } else {
         error!("Implementation failed (exit code nonzero)");
+        let log_path_str = log_file.display().to_string();
         td.log(&format!(
-            "Orchestrator: implementation failed — see {}",
-            log_file.display()
+            "Orchestrator: implementation failed — see {log_path_str}"
         ))
+        .ok();
+        td.handoff(
+            task_id,
+            "implementation attempted",
+            &format!("implementation failed — see {log_path_str}"),
+        )
         .ok();
         Ok(false)
     }

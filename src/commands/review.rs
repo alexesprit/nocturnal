@@ -48,6 +48,16 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
             )
             .ok();
         td_client.block(task_id).ok();
+        td_client
+            .handoff(
+                task_id,
+                &format!("review cycle {review_count} completed"),
+                &format!(
+                    "max review cycles reached ({review_count}/{}). Needs human review.",
+                    ctx.max_reviews
+                ),
+            )
+            .ok();
         return Ok(false);
     }
 
@@ -149,6 +159,17 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
                                 )
                                 .ok();
                             td_client.block(task_id)?;
+                            td_client
+                                .handoff(
+                                    task_id,
+                                    "review approved",
+                                    &format!(
+                                        "local merge failed ({new_count}/{} attempts). \
+                                         Needs human attention. Error: {e:#}",
+                                        ctx.max_reviews
+                                    ),
+                                )
+                                .ok();
                             info!(
                                 "Task blocked after {new_count} merge failures — needs human attention"
                             );
@@ -170,6 +191,16 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
                                     ctx.target_branch
                                 ),
                             )?;
+                            td_client
+                                .handoff(
+                                    task_id,
+                                    "review approved",
+                                    &format!(
+                                        "merge conflict — rebase onto {} needed. Error: {e:#}",
+                                        ctx.target_branch
+                                    ),
+                                )
+                                .ok();
                             info!(
                                 "Task reopened for rebase (attempt {new_count}/{})",
                                 ctx.max_reviews
@@ -209,7 +240,25 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
                 )
                 .ok();
             td_client.block(task_id).ok();
+            td_client
+                .handoff(
+                    task_id,
+                    &format!("review cycle {new_count} completed"),
+                    &format!(
+                        "max review cycles reached ({new_count}/{}). Needs human review.",
+                        ctx.max_reviews
+                    ),
+                )
+                .ok();
             info!("Task blocked — needs human attention");
+        } else {
+            td_client
+                .handoff(
+                    task_id,
+                    &format!("review cycle {new_count} completed"),
+                    "AI reviewer rejected the implementation — address feedback and reimplement",
+                )
+                .ok();
         }
     } else {
         info!(

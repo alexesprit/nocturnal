@@ -79,6 +79,12 @@ pub(crate) fn run_inner(ctx: &ProjectContext, task_id: Option<&str>) -> Result<b
 
         if !usage::has_budget() {
             info!("Usage budget low, deferring remaining work to next tick");
+            td.handoff(
+                &task_id,
+                "partial progress",
+                "budget exhausted, continue next tick",
+            )
+            .ok();
             break;
         }
 
