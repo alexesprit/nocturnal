@@ -78,15 +78,17 @@ nocturnal develop
 
 # Or specify the project explicitly
 nocturnal --project /path/to/repo develop
+nocturnal develop /path/to/repo
 
 # Target a specific task
 nocturnal develop --task td-abc123
-nocturnal implement --task td-abc123
 
-# Run a specific phase
-nocturnal implement  # Pick and implement the next open task
-nocturnal review     # Pick and review the next reviewable task
-nocturnal proposal   # Address comments on open MR/PR
+# Address comments on open MR/PR
+nocturnal proposal
+
+# Run in a loop until nothing is left to do
+nocturnal loop
+nocturnal loop --max-iterations 5
 ```
 
 ### Web Dashboard
@@ -117,36 +119,36 @@ Or pass via environment:
 export NOCTURNAL_PROJECTS=/path/to/project-a:/path/to/project-b
 ```
 
-Then choose a scheduling strategy:
+Then use the `--all` flag to run across all configured projects:
 
 ```bash
-# Round-robin: implement/review one project per invocation
-nocturnal develop-rotate
+# Implement/review one task across all projects
+nocturnal develop --all
 
-# All at once: process every project in a single invocation
-nocturnal foreach
+# Check proposals for review comments across all projects
+nocturnal proposal --all
 
-# Round-robin: check proposals for one project per invocation
-nocturnal proposal-rotate
+# Loop until nothing is left to do across all projects
+nocturnal loop --all
 ```
 
 ### Recommended Schedule
 
-Run `develop-rotate` in overnight batches on weeknights to implement and review tasks. Run `proposal-rotate` every 15 minutes to respond promptly to MR/PR comments. The two commands use separate locks and operate on disjoint task states, so they can run concurrently without conflict.
+Run `develop --all` in overnight batches on weeknights to implement and review tasks. Run `proposal --all` every 15 minutes to respond promptly to MR/PR comments. The two commands use separate locks and operate on disjoint task states, so they can run concurrently without conflict.
 
 #### cron
 
 ```cron
-# Rotate through projects nightly at 2 AM
-0 2 * * * nocturnal develop-rotate
+# Process all projects nightly at 2 AM
+0 2 * * * nocturnal develop --all
 
 # Check proposals for review comments every hour
-0 * * * * nocturnal proposal-rotate
+0 * * * * nocturnal proposal --all
 ```
 
 #### launchd
 
-`~/Library/LaunchAgents/com.nocturnal.develop-rotate.plist`:
+`~/Library/LaunchAgents/com.nocturnal.develop.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -155,7 +157,7 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.nocturnal.develop-rotate</string>
+  <string>com.nocturnal.develop</string>
 
   <!-- Use a login shell so PATH includes Homebrew, cargo, etc. -->
   <!-- caffeinate -s prevents macOS sleep during long Claude runs -->
@@ -164,7 +166,7 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
     <string>/bin/zsh</string>
     <string>-l</string>
     <string>-c</string>
-    <string>caffeinate -s nocturnal develop-rotate</string>
+    <string>caffeinate -s nocturnal develop --all</string>
   </array>
 
   <!-- Overnight batch: 1 AM, 2 AM, 3 AM Monday; daytime: 2 PM Monday -->
@@ -194,14 +196,14 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
   </array>
 
   <key>StandardOutPath</key>
-  <string>/tmp/nocturnal-logs/launchd-develop-rotate.log</string>
+  <string>/tmp/nocturnal-logs/launchd-develop.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/nocturnal-logs/launchd-develop-rotate.log</string>
+  <string>/tmp/nocturnal-logs/launchd-develop.log</string>
 </dict>
 </plist>
 ```
 
-`~/Library/LaunchAgents/com.nocturnal.proposal-rotate.plist`:
+`~/Library/LaunchAgents/com.nocturnal.proposal.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -210,14 +212,14 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.nocturnal.proposal-rotate</string>
+  <string>com.nocturnal.proposal</string>
 
   <key>ProgramArguments</key>
   <array>
     <string>/bin/zsh</string>
     <string>-l</string>
     <string>-c</string>
-    <string>nocturnal proposal-rotate</string>
+    <string>nocturnal proposal --all</string>
   </array>
 
   <!-- Every 15 minutes -->
@@ -230,9 +232,9 @@ Run `develop-rotate` in overnight batches on weeknights to implement and review 
   </array>
 
   <key>StandardOutPath</key>
-  <string>/tmp/nocturnal-logs/launchd-proposal-rotate.log</string>
+  <string>/tmp/nocturnal-logs/launchd-proposal.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/nocturnal-logs/launchd-proposal-rotate.log</string>
+  <string>/tmp/nocturnal-logs/launchd-proposal.log</string>
 </dict>
 </plist>
 ```

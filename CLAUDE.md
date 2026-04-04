@@ -46,7 +46,7 @@ cargo test
 For manual integration testing against a repo with `td init`:
 ```bash
 cd /path/to/repo-with-td-init
-/path/to/nocturnal implement    # or: review, develop, proposal, gc
+/path/to/nocturnal develop    # or: proposal, loop, gc
 ```
 
 Logs go to `$TMPDIR/nocturnal-logs/`. Check with:
@@ -62,7 +62,7 @@ Each project can have a `.nocturnal.toml` in its root. Top-level fields:
 - `review_provider` — override provider for review/proposal-review (falls back to `provider`)
 - `max_reviews` — max review cycles before blocking a task (default `3`)
 - `max_budget` — max USD per Claude run; omit for no budget limit (default: unlimited)
-- `auto_develop` — boolean (default `true`). When set to `false`, rotation commands (`develop-rotate`, `proposal-rotate`, `foreach`) skip the project. The web dashboard continues to show the project regardless.
+- `auto_develop` — boolean (default `true`). When set to `false`, `develop --all`, `proposal --all`, and `loop --all` skip the project. The web dashboard continues to show the project regardless.
 
 `[claude]` section (per-operation model config):
 - `model` — default Claude model for all operations (default `"sonnet"`)
