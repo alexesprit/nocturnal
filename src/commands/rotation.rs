@@ -8,12 +8,15 @@ use crate::config::{self, Config, ProjectContext};
 use crate::lock;
 use crate::project_config::load_project_settings;
 
+/// Rotate through projects and run `action` on the first eligible one.
+///
+/// Returns `Ok(true)` if a project was processed, `Ok(false)` if nothing was done in any project.
 pub fn rotate_projects(
     cfg: &Config,
     state_suffix: &str,
     lock_prefix: &str,
     action: impl Fn(&ProjectContext) -> Result<bool>,
-) -> Result<()> {
+) -> Result<bool> {
     let projects = cfg.projects_list();
     if projects.is_empty() {
         bail!(
@@ -82,13 +85,13 @@ pub fn rotate_projects(
 
         if cfg.dry_run {
             info!("dry-run: would process project {}", project_root.display());
-            return Ok(());
+            return Ok(true);
         }
 
         fs::write(&state_file, idx.to_string()).ok();
 
         match action(&ctx) {
-            Ok(true) => return Ok(()),
+            Ok(true) => return Ok(true),
             Ok(false) => {
                 info!(
                     "Nothing to do in {}, trying next project",
@@ -103,5 +106,5 @@ pub fn rotate_projects(
     }
 
     info!("Nothing to do in any project");
-    Ok(())
+    Ok(false)
 }

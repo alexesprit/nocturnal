@@ -62,6 +62,12 @@ enum Command {
     DevelopRotate,
     /// Run 'develop' for every project in the project list (same tick)
     Foreach,
+    /// Run develop-rotate in a loop until nothing is left to do
+    Loop {
+        /// Maximum number of iterations (default: unlimited)
+        #[arg(long, short = 'n')]
+        max_iterations: Option<usize>,
+    },
     /// Remove worktrees for completed/blocked tasks and clean stale locks
     Gc,
     /// Start a read-only web dashboard for td-managed projects
@@ -135,6 +141,7 @@ fn run(cli: Cli) -> Result<()> {
     match command {
         Command::Init => commands::init::run(&project_root, cfg.dry_run),
         Command::DevelopRotate => commands::rotate::run(&cfg),
+        Command::Loop { max_iterations } => commands::loop_cmd::run(&cfg, max_iterations),
         Command::ProposalRotate => commands::proposal_review_rotate::run(&cfg),
         Command::Foreach => commands::foreach::run(&cfg),
         Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
@@ -150,6 +157,7 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Gc => commands::gc::run(&ctx),
                 Command::Init
                 | Command::DevelopRotate
+                | Command::Loop { .. }
                 | Command::ProposalRotate
                 | Command::Foreach
                 | Command::Web { .. } => unreachable!(),
