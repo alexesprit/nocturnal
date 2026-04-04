@@ -183,7 +183,7 @@ a:hover {
 /* ============================================
    Layout: Header
    ============================================ */
-header > nav {
+.site-nav {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -193,14 +193,14 @@ header > nav {
   font-size: 0.85rem;
 }
 
-header > nav > a:first-child {
+.site-nav > a:first-child {
   font-family: var(--font-mono);
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.02em;
 }
 
-header > nav > a:first-child::before {
+.site-nav > a:first-child::before {
   content: '';
   display: inline-block;
   width: 8px;
@@ -210,26 +210,26 @@ header > nav > a:first-child::before {
   vertical-align: middle;
 }
 
-header > nav > a {
+.site-nav > a {
   color: var(--text-secondary);
 }
 
-header > nav > a:hover {
+.site-nav > a:hover {
   color: var(--accent);
 }
 
-header > nav > .separator {
+.site-nav > .separator {
   color: var(--text-tertiary);
   font-weight: 400;
 }
 
-header > nav > span:last-child {
+.site-nav > span:last-child {
   color: var(--text-primary);
   font-weight: 500;
 }
 
 /* Top accent bar */
-body > header {
+.site-header {
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
 }
@@ -246,13 +246,13 @@ main {
 /* ============================================
    Dashboard: Page Title
    ============================================ */
-main > h1 {
+.page-title {
   margin-bottom: 2rem;
   position: relative;
   display: inline-block;
 }
 
-main > h1::after {
+.page-title::after {
   content: '';
   position: absolute;
   bottom: -4px;
@@ -560,32 +560,32 @@ td a:hover {
 
 
 /* Issue header */
-main > header {
+.issue-header {
   border: none;
   background: none;
   margin-bottom: 2rem;
   padding: 0;
 }
 
-main > header h1 {
+.issue-header h1 {
   margin-bottom: 0.75rem;
 }
 
-main > header p small {
+.issue-meta small {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--text-tertiary);
   font-weight: 400;
 }
 
-main > header p {
+.issue-meta {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
 
-main > header p span {
+.issue-meta span {
   font-size: 0.8rem;
   color: var(--text-tertiary);
   font-weight: 500;
@@ -594,25 +594,25 @@ main > header p span {
 }
 
 /* Sections in issue detail */
-main > section {
+.issue-section {
   margin-bottom: 2rem;
 }
 
 /* Metadata definition list */
-main > section > dl {
+.metadata-dl {
   display: grid;
   grid-template-columns: 140px 1fr;
   gap: 0;
   font-size: 0.88rem;
 }
 
-main > section > dl dt {
+.metadata-dl dt {
   color: var(--text-tertiary);
   font-weight: 500;
   padding: 0.2rem 0;
 }
 
-main > section > dl dd {
+.metadata-dl dd {
   color: var(--text-primary);
   padding: 0.2rem 0;
   margin: 0;
@@ -738,25 +738,25 @@ pre {
 }
 
 /* Lists in issue detail */
-main > section > ul {
+.relation-list {
   list-style: none;
   padding: 0;
 }
 
-main > section > ul li {
+.relation-list li {
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.88rem;
 }
 
-main > section > ul li a {
+.relation-list li a {
   font-family: var(--font-mono);
   font-size: 0.82rem;
   margin-right: 0.5rem;
 }
 
 /* Comments */
-main > section > article {
+.comment {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
@@ -764,7 +764,7 @@ main > section > article {
   margin-bottom: 0.75rem;
 }
 
-main > section > article header {
+.comment-header {
   border: none;
   background: none;
   display: flex;
@@ -773,16 +773,16 @@ main > section > article header {
   margin-bottom: 0.5rem;
 }
 
-main > section > article header strong {
+.comment-header strong {
   font-size: 0.88rem;
 }
 
-main > section > article header small {
+.comment-header small {
   font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
-main > section > article pre {
+.comment pre {
   border: none;
   background: none;
   padding: 0;
@@ -1049,7 +1049,7 @@ td code {
   }
 }
 
-main > h1 {
+.page-title {
   animation: fadeSlideUp 0.4s var(--ease-out) both;
 }
 
@@ -1072,18 +1072,18 @@ table {
   animation: fadeSlideUp 0.4s var(--ease-out) 0.1s both;
 }
 
-main > header {
+.issue-header {
   animation: fadeSlideUp 0.4s var(--ease-out) 0.05s both;
 }
 
-main > section {
+.issue-section {
   animation: fadeSlideUp 0.35s var(--ease-out) both;
 }
 
-main > section:nth-of-type(1) { animation-delay: 0.1s; }
-main > section:nth-of-type(2) { animation-delay: 0.15s; }
-main > section:nth-of-type(3) { animation-delay: 0.2s; }
-main > section:nth-of-type(4) { animation-delay: 0.25s; }
+.issue-section:nth-of-type(1) { animation-delay: 0.1s; }
+.issue-section:nth-of-type(2) { animation-delay: 0.15s; }
+.issue-section:nth-of-type(3) { animation-delay: 0.2s; }
+.issue-section:nth-of-type(4) { animation-delay: 0.25s; }
 
 /* ============================================
    HTMX loading indicator
@@ -1130,7 +1130,7 @@ main > section:nth-of-type(4) { animation-delay: 0.25s; }
 
   main { padding: 1.25rem; }
 
-  header > nav { padding: 1rem 1.25rem; }
+  .site-nav { padding: 1rem 1.25rem; }
 
   .project-grid {
     grid-template-columns: 1fr;
@@ -1149,7 +1149,7 @@ main > section:nth-of-type(4) { animation-delay: 0.25s; }
     min-width: 100%;
   }
 
-  main > section > dl {
+  .metadata-dl {
     grid-template-columns: 110px 1fr;
   }
 
