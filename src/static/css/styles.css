@@ -418,18 +418,20 @@ main > h1::after {
   color: var(--status-closed);
 }
 
-/* Priority Badges — tinted background with colored text */
-.badge-priority {
-  --_pri-tint: var(--text-secondary);
-  background: color-mix(in srgb, var(--_pri-tint) 15%, var(--bg-tertiary));
-  color: var(--_pri-tint);
+/* Tinted Badges — shared base for priority and noc badges */
+.badge-priority,
+.badge-noc {
+  --_badge-tint: var(--text-secondary);
+  background: color-mix(in srgb, var(--_badge-tint) 15%, var(--bg-tertiary));
+  color: var(--_badge-tint);
 }
 
-.badge-priority-P0 { --_pri-tint: var(--priority-p0); }
-.badge-priority-P1 { --_pri-tint: var(--priority-p1); }
-.badge-priority-P2 { --_pri-tint: var(--priority-p2); }
-.badge-priority-P3 { --_pri-tint: var(--priority-p3); }
-.badge-priority-P4 { --_pri-tint: var(--priority-p4); opacity: 0.7; }
+/* Priority Badges */
+.badge-priority-P0 { --_badge-tint: var(--priority-p0); }
+.badge-priority-P1 { --_badge-tint: var(--priority-p1); }
+.badge-priority-P2 { --_badge-tint: var(--priority-p2); }
+.badge-priority-P3 { --_badge-tint: var(--priority-p3); }
+.badge-priority-P4 { --_badge-tint: var(--priority-p4); opacity: 0.7; }
 
 /* Priority Select — inline dropdown styled as a priority badge */
 .priority-select-wrapper {
@@ -838,20 +840,14 @@ main > section > article pre {
 /* ============================================
    Nocturnal Badges
    ============================================ */
-.badge-noc {
-  --_noc-tint: var(--text-secondary);
-  background: color-mix(in srgb, var(--_noc-tint) 15%, var(--bg-tertiary));
-  color: var(--_noc-tint);
-}
-
-.badge-noc-implementing { --_noc-tint: var(--status-in-progress); }
-.badge-noc-reviewing    { --_noc-tint: var(--status-in-review); }
-.badge-noc-blocked      { --_noc-tint: var(--status-blocked); }
-.badge-noc-proposal-pending { --_noc-tint: var(--status-in-review); }
-.badge-noc-proposal-ready   { --_noc-tint: var(--status-open); }
-.badge-noc-idle    { --_noc-tint: var(--text-tertiary); }
-.badge-noc-running { --_noc-tint: var(--status-in-progress); }
-.badge-noc-stale   { --_noc-tint: var(--status-blocked); }
+.badge-noc-implementing { --_badge-tint: var(--status-in-progress); }
+.badge-noc-reviewing    { --_badge-tint: var(--status-in-review); }
+.badge-noc-blocked      { --_badge-tint: var(--status-blocked); }
+.badge-noc-proposal-pending { --_badge-tint: var(--status-in-review); }
+.badge-noc-proposal-ready   { --_badge-tint: var(--status-open); }
+.badge-noc-idle    { --_badge-tint: var(--text-tertiary); }
+.badge-noc-running { --_badge-tint: var(--status-in-progress); }
+.badge-noc-stale   { --_badge-tint: var(--status-blocked); }
 
 /* ============================================
    Orchestrator Status Section
