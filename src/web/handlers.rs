@@ -1,8 +1,6 @@
-use std::fmt::Write as _;
-use std::path::{Path as FsPath, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use askama::Template;
 use axum::extract::{Form, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
@@ -10,133 +8,19 @@ use serde::Deserialize;
 use tracing::{error, warn};
 
 use super::AppState;
-use super::models::{
-    IssueDetail, ListOpts, LockStatus, NextTask, NocBadge, NocIssueState, NocProjectStatus,
-    NocTaskCounts, OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
+use super::helpers::{
+    ALLOWED_PRIORITIES, ALLOWED_SORTS, ALLOWED_STATUSES, ALLOWED_TYPES, ALLOWED_VIEWS,
+    FEEDBACK_HTML_DEVELOP_RUNNING, FEEDBACK_HTML_DEVELOP_TRIGGERED, FEEDBACK_HTML_FAILED_TO_START,
+    FEEDBACK_HTML_ROTATE_RUNNING, FEEDBACK_HTML_ROTATE_TRIGGERED, MAX_QUERY_LEN, check_lock_status,
+    derive_noc_state, fetch_orchestrator_status, fetch_project_status, group_by_status,
+    is_valid_issue_id, priority_select_html, sanitize_param,
 };
-use crate::config;
-use crate::lock::is_process_alive;
-use crate::td::{Task, Td};
-
-// --- Validation allowlists ---
-
-const ALLOWED_STATUSES: &[&str] = &[
-    "all",
-    "open",
-    "closed",
-    "in_progress",
-    "blocked",
-    "in_review",
-];
-const ALLOWED_PRIORITIES: &[&str] = &["all", "P0", "P1", "P2", "P3", "P4"];
-const ALLOWED_TYPES: &[&str] = &["all", "bug", "feature", "task", "epic", "chore"];
-const ALLOWED_SORTS: &[&str] = &[
-    "priority", "created", "modified", "status", "title", "updated",
-];
-const ALLOWED_VIEWS: &[&str] = &["table", "kanban"];
-const MAX_QUERY_LEN: usize = 200;
-
-fn sanitize_param(value: &str, allowed: &[&str]) -> Option<String> {
-    if allowed.contains(&value) {
-        Some(value.to_string())
-    } else {
-        None
-    }
-}
-
-fn is_valid_issue_id(id: &str) -> bool {
-    crate::td::validate_task_id(id).is_ok()
-}
-
-// --- Askama templates ---
-
-struct Breadcrumb {
-    label: String,
-    url: Option<String>,
-}
-
-#[derive(Template)]
-#[template(path = "dashboard.html")]
-struct DashboardTemplate {
-    title: String,
-    breadcrumbs: Vec<Breadcrumb>,
-    projects: Vec<ProjectStatus>,
-    orchestrator: OrchestratorStatus,
-}
-
-#[derive(Template)]
-#[template(path = "project.html")]
-struct ProjectTemplate {
-    title: String,
-    breadcrumbs: Vec<Breadcrumb>,
-    name: String,
-    view: String,
-    issues: Vec<Task>,
-    open: Vec<Task>,
-    in_progress: Vec<Task>,
-    blocked: Vec<Task>,
-    in_review: Vec<Task>,
-    recently_closed: Vec<Task>,
-}
-
-#[derive(Template)]
-#[template(path = "project_error.html")]
-struct ProjectErrorTemplate {
-    title: String,
-    breadcrumbs: Vec<Breadcrumb>,
-    error_msg: String,
-}
-
-#[derive(Template)]
-#[template(path = "issue.html")]
-struct IssueTemplate {
-    title: String,
-    breadcrumbs: Vec<Breadcrumb>,
-    project_name: String,
-    issue: IssueDetail,
-    noc_state: Option<NocIssueState>,
-}
-
-#[derive(Template)]
-#[template(path = "partials/table_wrapper.html")]
-struct TableWrapperTemplate {
-    name: String,
-    issues: Vec<Task>,
-}
-
-#[derive(Template)]
-#[template(path = "partials/kanban_board.html")]
-struct KanbanBoardTemplate {
-    name: String,
-    open: Vec<Task>,
-    in_progress: Vec<Task>,
-    blocked: Vec<Task>,
-    in_review: Vec<Task>,
-}
-
-#[derive(Template)]
-#[template(path = "partials/issue_table_error.html")]
-struct IssueTableErrorTemplate {
-    error_msg: String,
-}
-
-mod filters {
-    pub use crate::web::filters::{format_date, format_datetime};
-
-    #[allow(clippy::unnecessary_wraps)]
-    pub fn render_markdown(s: &str, _values: &dyn askama::Values) -> askama::Result<String> {
-        Ok(crate::web::markdown::render(s))
-    }
-
-    #[allow(clippy::unnecessary_wraps)]
-    pub fn join_labels(
-        labels: &[String],
-        _values: &dyn askama::Values,
-        sep: &str,
-    ) -> askama::Result<String> {
-        Ok(labels.join(sep))
-    }
-}
+use super::models::{ListOpts, LockStatus, OrchestratorStatus};
+use super::templates::{
+    Breadcrumb, DashboardTemplate, IssueTableErrorTemplate, IssueTemplate, KanbanBoardTemplate,
+    ProjectErrorTemplate, ProjectTemplate, TableWrapperTemplate, into_html_response,
+};
+use crate::td::Td;
 
 // --- Query params ---
 
@@ -215,347 +99,6 @@ pub async fn dashboard(State(state): State<Arc<AppState>>) -> Response {
     };
 
     into_html_response(tmpl)
-}
-
-fn fetch_project_status(
-    name: &str,
-    path: &FsPath,
-    lock_dir: &FsPath,
-    _max_reviews: u32,
-) -> ProjectStatus {
-    let path_str = path.to_string_lossy();
-    let td = Td::new(path);
-    let tasks = match td.list(&ListOpts::default()) {
-        Ok(tasks) => tasks,
-        Err(e) => {
-            warn!("td list failed for {name}: {e}");
-            return ProjectStatus {
-                name: name.to_string(),
-                path: path_str.into_owned(),
-                counts: StatusCounts::default(),
-                total: 0,
-                error: Some(e.to_string()),
-                noc: None,
-            };
-        }
-    };
-
-    let mut counts = StatusCounts::default();
-    let mut noc_counts = NocTaskCounts::default();
-
-    for task in &tasks {
-        match task.status.as_str() {
-            "open" => counts.open += 1,
-            "in_progress" => counts.in_progress += 1,
-            "blocked" => counts.blocked += 1,
-            "in_review" => counts.in_review += 1,
-            _ => {}
-        }
-
-        let has_noc_reviews = task.labels.iter().any(|l| l.starts_with("noc-reviews:"));
-        let has_proposal = task.labels.iter().any(|l| l.starts_with("noc-proposal:"));
-        let has_proposal_ready = task.labels.iter().any(|l| l == "noc-proposal-ready");
-
-        if has_proposal_ready && task.status != "closed" {
-            noc_counts.proposal_ready += 1;
-        } else if has_proposal && task.status != "closed" {
-            noc_counts.proposal_pending += 1;
-        } else if has_noc_reviews {
-            match task.status.as_str() {
-                "in_progress" => noc_counts.implementing += 1,
-                "in_review" => noc_counts.reviewing += 1,
-                _ => {}
-            }
-        }
-    }
-
-    let total = counts.open + counts.in_progress + counts.blocked + counts.in_review;
-
-    let worktree_task_ids = collect_worktree_task_ids(path);
-    let slug = config::project_slug(path);
-    let lock_status = check_lock_status(lock_dir, &slug);
-
-    let lock_status_label = lock_status.label().to_string();
-    let lock_status_css = lock_status.css_class().to_string();
-    let worktree_count = worktree_task_ids.len();
-
-    let noc = Some(NocProjectStatus {
-        worktree_task_ids,
-        worktree_count,
-        lock_status,
-        lock_status_label,
-        lock_status_css,
-        counts: noc_counts,
-    });
-
-    ProjectStatus {
-        name: name.to_string(),
-        path: path_str.into_owned(),
-        counts,
-        total,
-        error: None,
-        noc,
-    }
-}
-
-fn collect_worktree_task_ids(project_path: &FsPath) -> Vec<String> {
-    crate::git::list_nocturnal_worktrees(project_path)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(_, task_id)| task_id)
-        .collect()
-}
-
-fn check_lock_status(lock_dir: &FsPath, slug: &str) -> LockStatus {
-    // Check both develop (run-{slug}) and proposal ({proposal-{slug}) locks.
-    let lock_names = [
-        format!("nocturnal.run-{slug}.lock"),
-        format!("nocturnal.proposal-{slug}.lock"),
-    ];
-    let Some(lock_path) = lock_names
-        .iter()
-        .map(|n| lock_dir.join(n))
-        .find(|p| p.is_dir())
-    else {
-        return LockStatus::Idle;
-    };
-
-    let pid_file = lock_path.join("pid");
-    let Ok(pid_str) = std::fs::read_to_string(&pid_file) else {
-        return LockStatus::Stale;
-    };
-
-    let pid: u32 = match pid_str.trim().parse() {
-        Ok(p) => p,
-        Err(_) => return LockStatus::Stale,
-    };
-
-    if is_process_alive(pid) {
-        LockStatus::Running(pid)
-    } else {
-        LockStatus::Stale
-    }
-}
-
-fn fetch_orchestrator_status(
-    rotation_state_file: &str,
-    log_dir: &FsPath,
-    projects: &[(String, PathBuf)],
-) -> OrchestratorStatus {
-    let (current_project, next_project) = read_rotation_state(rotation_state_file, projects);
-
-    let next_task = next_project.as_ref().and_then(|name| {
-        let path = projects
-            .iter()
-            .find(|(n, _)| n == name)
-            .map(|(_, p)| p.as_path())?;
-        fetch_next_task(path)
-    });
-
-    let recent_logs = crate::activity::read_recent(log_dir, 5)
-        .into_iter()
-        .map(|e| RecentLogEntry {
-            command: e.command,
-            project: e.project,
-            task_id: e.task_id,
-            started: format_iso_datetime(&e.started_at),
-            duration: format_duration_secs(e.duration_secs),
-        })
-        .collect();
-
-    OrchestratorStatus {
-        current_project,
-        next_project,
-        next_task,
-        recent_logs,
-    }
-}
-
-fn fetch_next_task(project_path: &FsPath) -> Option<NextTask> {
-    let td = Td::new(project_path);
-    let vcs_mode = crate::project_config::load_vcs_mode(project_path);
-    let check_proposals = crate::vcs::detect_platform(project_path, vcs_mode).is_some();
-    let action = td.get_next_action(check_proposals).ok()?;
-
-    let task_id = action.task_id()?;
-    let action_label = action.label().to_string();
-    let detail = td.show_detail(task_id).ok()?;
-    Some(NextTask {
-        action: action_label,
-        id: detail.id,
-        title: detail.title,
-        priority: detail.priority,
-    })
-}
-
-fn read_rotation_state(
-    rotation_state_file: &str,
-    projects: &[(String, PathBuf)],
-) -> (Option<String>, Option<String>) {
-    if projects.is_empty() {
-        return (None, None);
-    }
-
-    let last_idx: Option<usize> = std::fs::read_to_string(rotation_state_file)
-        .ok()
-        .and_then(|s| s.trim().parse().ok());
-
-    match last_idx {
-        Some(idx) if idx < projects.len() => {
-            let current = projects[idx].0.clone();
-            let next_idx = (idx + 1) % projects.len();
-            let next = projects[next_idx].0.clone();
-            (Some(current), Some(next))
-        }
-        _ => (None, Some(projects[0].0.clone())),
-    }
-}
-
-fn format_iso_datetime(s: &str) -> String {
-    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").map_or_else(
-        |_| s.to_string(),
-        |dt| dt.format("%b %-d, %Y %H:%M").to_string(),
-    )
-}
-
-fn format_duration_secs(secs: u64) -> String {
-    if secs < 60 {
-        format!("{secs}s")
-    } else if secs < 3600 {
-        format!("{}m {}s", secs / 60, secs % 60)
-    } else {
-        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
-    }
-}
-
-fn build_proposal_url(project_path: &FsPath, proposal_id: &str) -> Option<(String, String)> {
-    let remote = crate::git::remote_url(project_path)?;
-    let base_url = parse_remote_to_https_base(&remote)?;
-
-    if remote.contains("github") {
-        let url = format!("{base_url}/pull/{proposal_id}");
-        let label = format!("PR #{proposal_id}");
-        Some((url, label))
-    } else if remote.contains("gitlab") {
-        let url = format!("{base_url}/-/merge_requests/{proposal_id}");
-        let label = format!("MR #{proposal_id}");
-        Some((url, label))
-    } else {
-        None
-    }
-}
-
-fn parse_remote_to_https_base(remote: &str) -> Option<String> {
-    // SSH: git@github.com:owner/repo.git
-    if let Some(rest) = remote.strip_prefix("git@") {
-        let (host, path) = rest.split_once(':')?;
-        let path = path.trim_end_matches(".git");
-        return Some(format!("https://{host}/{path}"));
-    }
-    // HTTPS: https://github.com/owner/repo.git
-    if remote.starts_with("https://") || remote.starts_with("http://") {
-        let url = remote.trim_end_matches(".git");
-        return Some(url.to_string());
-    }
-    None
-}
-
-fn derive_noc_state(
-    labels: &[String],
-    status: &str,
-    max_reviews: u32,
-    project_path: &FsPath,
-    issue_id: &str,
-) -> Option<NocIssueState> {
-    let review_count = labels.iter().find_map(|l| {
-        l.strip_prefix("noc-reviews:")
-            .and_then(|n| n.parse::<u32>().ok())
-    });
-
-    let badge;
-    let review_cycle;
-
-    if let Some(n) = review_count {
-        review_cycle = Some(n);
-        if n >= max_reviews {
-            badge = NocBadge {
-                text: "blocked (max reviews)".to_string(),
-                css_class: "blocked".to_string(),
-            };
-        } else {
-            match status {
-                "in_progress" => {
-                    badge = NocBadge {
-                        text: "implementing".to_string(),
-                        css_class: "implementing".to_string(),
-                    };
-                }
-                "in_review" => {
-                    badge = NocBadge {
-                        text: "noc reviewing".to_string(),
-                        css_class: "reviewing".to_string(),
-                    };
-                }
-                _ => return None,
-            }
-        }
-    } else if labels.iter().any(|l| l == "noc-proposal-ready") {
-        if status == "closed" {
-            return None;
-        }
-        review_cycle = None;
-        badge = NocBadge {
-            text: "proposal ready".to_string(),
-            css_class: "proposal-ready".to_string(),
-        };
-    } else if labels.iter().any(|l| l.starts_with("noc-proposal:")) {
-        if status == "closed" {
-            return None;
-        }
-        review_cycle = None;
-        badge = NocBadge {
-            text: "proposal pending".to_string(),
-            css_class: "proposal-pending".to_string(),
-        };
-    } else {
-        return None;
-    }
-
-    // Find worktree for this task
-    let (worktree_path, worktree_branch) = find_worktree_for_task(project_path, issue_id);
-
-    // Build proposal URL if a proposal label exists
-    let (proposal_url, proposal_label) = labels
-        .iter()
-        .find_map(|l| {
-            l.strip_prefix("noc-proposal:")
-                .map(std::string::ToString::to_string)
-        })
-        .and_then(|id| build_proposal_url(project_path, &id))
-        .map_or((None, None), |(url, label)| (Some(url), Some(label)));
-
-    Some(NocIssueState {
-        badge,
-        review_cycle,
-        max_reviews,
-        worktree_path,
-        worktree_branch,
-        proposal_url,
-        proposal_label,
-    })
-}
-
-fn find_worktree_for_task(
-    project_path: &FsPath,
-    task_id: &str,
-) -> (Option<String>, Option<String>) {
-    match crate::git::worktree_path(project_path, task_id) {
-        Ok(Some(path)) => (
-            Some(path.to_string_lossy().into_owned()),
-            Some(format!("nocturnal/{task_id}")),
-        ),
-        _ => (None, None),
-    }
 }
 
 pub async fn project(
@@ -843,23 +386,6 @@ pub async fn issue(
     }
 }
 
-fn group_by_status(issues: Vec<Task>) -> (Vec<Task>, Vec<Task>, Vec<Task>, Vec<Task>) {
-    let mut open = Vec::new();
-    let mut in_progress = Vec::new();
-    let mut blocked = Vec::new();
-    let mut in_review = Vec::new();
-    for task in issues {
-        match task.status.as_str() {
-            "open" => open.push(task),
-            "in_progress" => in_progress.push(task),
-            "blocked" => blocked.push(task),
-            "in_review" => in_review.push(task),
-            _ => {}
-        }
-    }
-    (open, in_progress, blocked, in_review)
-}
-
 // --- API handlers ---
 
 pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
@@ -876,20 +402,14 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
     .unwrap_or(false);
 
     if is_running {
-        return Html(
-            r#"<span class="rotate-feedback rotate-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('rotate-feedback');if(f)f.innerHTML='';},4000);</script>"#,
-        )
-        .into_response();
+        return Html(FEEDBACK_HTML_ROTATE_RUNNING).into_response();
     }
 
     let exe = match std::env::current_exe() {
         Ok(e) => e,
         Err(e) => {
             error!("failed to get current exe: {e}");
-            return Html(
-                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
-            )
-            .into_response();
+            return Html(FEEDBACK_HTML_FAILED_TO_START).into_response();
         }
     };
 
@@ -900,16 +420,10 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
         .stderr(std::process::Stdio::null())
         .spawn()
     {
-        Ok(_child) => Html(
-            r#"<span class="rotate-feedback rotate-feedback-ok">Rotation triggered</span><script>setTimeout(function(){var f=document.getElementById('rotate-feedback');if(f)f.innerHTML='';},4000);</script>"#,
-        )
-        .into_response(),
+        Ok(_child) => Html(FEEDBACK_HTML_ROTATE_TRIGGERED).into_response(),
         Err(e) => {
             error!("failed to spawn rotate: {e}");
-            Html(
-                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
-            )
-            .into_response()
+            Html(FEEDBACK_HTML_FAILED_TO_START).into_response()
         }
     }
 }
@@ -928,20 +442,14 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
     let project_path = entry.path.clone();
 
     if matches!(lock_status, LockStatus::Running(_)) {
-        return Html(
-            r#"<span class="rotate-feedback rotate-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('develop-feedback');if(f)f.innerHTML='';},4000);</script>"#,
-        )
-        .into_response();
+        return Html(FEEDBACK_HTML_DEVELOP_RUNNING).into_response();
     }
 
     let exe = match std::env::current_exe() {
         Ok(e) => e,
         Err(e) => {
             error!("failed to get current exe: {e}");
-            return Html(
-                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
-            )
-            .into_response();
+            return Html(FEEDBACK_HTML_FAILED_TO_START).into_response();
         }
     };
 
@@ -953,16 +461,10 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
         .stderr(std::process::Stdio::null())
         .spawn()
     {
-        Ok(_child) => Html(
-            r#"<span class="rotate-feedback rotate-feedback-ok">Develop triggered</span><script>setTimeout(function(){var f=document.getElementById('develop-feedback');if(f)f.innerHTML='';},4000);</script>"#,
-        )
-        .into_response(),
+        Ok(_child) => Html(FEEDBACK_HTML_DEVELOP_TRIGGERED).into_response(),
         Err(e) => {
             error!("failed to spawn run for {name}: {e}");
-            Html(
-                r#"<span class="rotate-feedback rotate-feedback-error">Failed to start</span>"#,
-            )
-            .into_response()
+            Html(FEEDBACK_HTML_FAILED_TO_START).into_response()
         }
     }
 }
@@ -1017,32 +519,4 @@ pub async fn update_priority(
             (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
         }
     }
-}
-
-// --- Helpers ---
-
-fn into_html_response<T: Template>(tmpl: T) -> Response {
-    match tmpl.render() {
-        Ok(html) => Html(html).into_response(),
-        Err(e) => {
-            error!("template render error: {e}");
-            (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
-        }
-    }
-}
-
-fn priority_select_html(project_name: &str, issue_id: &str, current_priority: &str) -> String {
-    let priorities = &["P0", "P1", "P2", "P3", "P4"];
-    let mut options = String::new();
-    for p in priorities {
-        let selected = if *p == current_priority {
-            " selected"
-        } else {
-            ""
-        };
-        let _ = write!(options, r#"<option value="{p}"{selected}>{p}</option>"#);
-    }
-    format!(
-        "<span class=\"priority-select-wrapper badge badge-priority badge-priority-{current_priority}\" id=\"priority-select-{issue_id}\"><select class=\"priority-select\" hx-post=\"/api/projects/{project_name}/issues/{issue_id}/priority\" hx-trigger=\"change\" hx-target=\"#priority-select-{issue_id}\" hx-swap=\"outerHTML\" name=\"priority\">{options}</select></span>"
-    )
 }

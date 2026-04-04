@@ -1,7 +1,9 @@
 pub mod filters;
 pub mod handlers;
+mod helpers;
 pub mod markdown;
 pub mod models;
+mod templates;
 
 use std::path::Path;
 use std::path::PathBuf;
