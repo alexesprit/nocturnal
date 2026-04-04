@@ -4,6 +4,9 @@ use std::process::Command;
 
 use anyhow::Result;
 
+use crate::project_config::VcsMode;
+use crate::vcs;
+
 struct ToolCheck {
     name: &'static str,
     required: bool,
@@ -73,16 +76,9 @@ fn check_tools(project_root: &Path) -> bool {
     println!("Checking required tools:");
 
     // Detect which VCS tools to check based on git remote
-    let remote_url = Command::new("git")
-        .args(["remote", "get-url", "origin"])
-        .current_dir(project_root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-
-    let need_gh = remote_url.as_deref().is_some_and(|u| u.contains("github"));
-    let need_glab = remote_url.as_deref().is_some_and(|u| u.contains("gitlab"));
+    let platform = vcs::detect_platform(project_root, VcsMode::Auto);
+    let need_gh = platform == Some(vcs::Platform::GitHub);
+    let need_glab = platform == Some(vcs::Platform::GitLab);
 
     let mut all_required_ok = true;
 
@@ -149,18 +145,10 @@ fn init_td(project_root: &Path, dry_run: bool) -> Result<()> {
 }
 
 fn detect_vcs_mode(project_root: &Path) -> &'static str {
-    let url = Command::new("git")
-        .args(["remote", "get-url", "origin"])
-        .current_dir(project_root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-
-    match url.as_deref() {
-        Some(u) if u.contains("gitlab") => "gitlab",
-        Some(u) if u.contains("github") => "github",
-        _ => "off",
+    match vcs::detect_platform(project_root, VcsMode::Auto) {
+        Some(vcs::Platform::GitHub) => "github",
+        Some(vcs::Platform::GitLab) => "gitlab",
+        None => "off",
     }
 }
 
