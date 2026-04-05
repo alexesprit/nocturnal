@@ -23,6 +23,14 @@ if [ "$current" = "main" ] || [ "$current" = "master" ]; then
 fi
 ```
 
+## Changed Files
+
+The following files were modified during implementation:
+
+{{LINKED_FILES}}
+
+Use this as a guide for your review, but also check `git diff --stat` for the complete picture.
+
 ## Review Process
 
 ### 1. Examine Changes

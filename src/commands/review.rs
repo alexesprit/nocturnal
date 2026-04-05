@@ -33,6 +33,16 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
     })?;
 
     let review_cycle = review_count + 1;
+    let linked_files = td_client.files(task_id);
+    let files_str = if linked_files.is_empty() {
+        "No files linked — use `git diff --stat` to discover changes.".to_string()
+    } else {
+        linked_files
+            .iter()
+            .map(|f| format!("- `{}` ({})", f.file_path, f.role))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
     let rendered = prompt::render_with_review_cycle(
         prompt::Template::Review,
         task_id,
@@ -40,7 +50,8 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         ctx.settings.max_reviews,
         Some(review_cycle),
         &ctx.settings.base_branch,
-    );
+    )
+    .replace("{{LINKED_FILES}}", &files_str);
 
     let slug = ctx.project_slug();
     let log_file = backend::log_path(&ctx.cfg.log_dir, "review", task_id);
