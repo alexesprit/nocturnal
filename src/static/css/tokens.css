@@ -1,0 +1,160 @@
+/* tokens.css — Design tokens: Google Fonts, CSS custom properties (dark + light themes)
+   ================================================================ */
+
+/* nocturnal — Soft Warm Theme
+   A warm variation of the Soft Dashboard: amber/golden accents,
+   warm dark brown/charcoal dark mode, cream/ivory light mode.
+   Earth-toned status colors, slightly more compact spacing.
+   ================================================================ */
+
+/* ============================================
+   Fonts: Figtree (display) + DM Sans (body)
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ============================================
+   CSS Variables — Dark Theme (default)
+   Warm dark browns/charcoals
+   ============================================ */
+:root {
+  color-scheme: light dark;
+
+  --bg-primary: #141210;
+  --bg-secondary: #1c1914;
+  --bg-tertiary: #252018;
+  --bg-elevated: #332c20;
+  --bg-hover: #3a3226;
+  --bg-card: #1e1a13;
+  --bg-card-hover: #28231a;
+  --bg-glass: rgba(28, 25, 20, 0.88);
+
+  --text-primary: #ede8df;
+  --text-secondary: #a89e8c;
+  --text-tertiary: #6e6454;
+  --text-inverse: #141210;
+
+  --accent: #e8a040;
+  --accent-dim: #d08a30;
+  --accent-glow: rgba(232, 160, 64, 0.14);
+  --accent-subtle: rgba(232, 160, 64, 0.08);
+
+  --border: rgba(142, 128, 100, 0.15);
+  --border-strong: rgba(142, 128, 100, 0.28);
+  --border-card: rgba(142, 128, 100, 0.12);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35), 0 4px 8px rgba(0, 0, 0, 0.18);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 1px rgba(142, 128, 100, 0.1);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(232, 160, 64, 0.1);
+
+  /* Earth-toned status colors — warm blues, sage greens, terracotta */
+  --status-open: #6a9ecf;
+  --status-open-bg: rgba(106, 158, 207, 0.12);
+  --status-in-progress: #e8a040;
+  --status-in-progress-bg: rgba(232, 160, 64, 0.12);
+  --status-blocked: #c86050;
+  --status-blocked-bg: rgba(200, 96, 80, 0.14);
+  --status-in-review: #b89060;
+  --status-in-review-bg: rgba(184, 144, 96, 0.14);
+  --status-closed: #6e6454;
+  --status-closed-bg: rgba(110, 100, 84, 0.14);
+
+  --priority-p0: #c86050;
+  --priority-p0-bg: rgba(200, 96, 80, 0.14);
+  --priority-p1: #d48040;
+  --priority-p1-bg: rgba(212, 128, 64, 0.12);
+  --priority-p2: #e8a040;
+  --priority-p2-bg: rgba(232, 160, 64, 0.12);
+  --priority-p3: #6e6454;
+  --priority-p3-bg: rgba(110, 100, 84, 0.12);
+  --priority-p4: #544c3e;
+  --priority-p4-bg: rgba(84, 76, 62, 0.10);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 100px;
+
+  --font-display: 'Figtree', system-ui, -apple-system, sans-serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+
+  --content-max-width: 1140px;
+
+  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --grain-opacity: 0.022;
+
+  --gradient-card: linear-gradient(135deg, rgba(232, 160, 64, 0.03) 0%, rgba(184, 144, 96, 0.02) 100%);
+  --gradient-header: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+/* ============================================
+   Light Theme — explicit override
+   Warm cream/ivory tones
+   ============================================ */
+:root[data-theme="light"] {
+  --bg-primary: #faf8f3;
+  --bg-secondary: #f2ede4;
+  --bg-tertiary: #e8e2d6;
+  --bg-elevated: #ddd6c8;
+  --bg-hover: #d6cfc0;
+  --bg-card: #fffefa;
+  --bg-card-hover: #f8f4ec;
+  --bg-glass: rgba(250, 248, 243, 0.92);
+
+  --text-primary: #2c2418;
+  --text-secondary: #6b5d4a;
+  --text-tertiary: #9a8e7c;
+  --text-inverse: #faf8f3;
+
+  --accent: #c88020;
+  --accent-dim: #b07018;
+  --accent-glow: rgba(200, 128, 32, 0.12);
+  --accent-subtle: rgba(200, 128, 32, 0.06);
+
+  --border: rgba(60, 48, 30, 0.08);
+  --border-strong: rgba(60, 48, 30, 0.14);
+  --border-card: rgba(60, 48, 30, 0.06);
+
+  --shadow-sm: 0 1px 3px rgba(40, 30, 10, 0.06), 0 1px 2px rgba(40, 30, 10, 0.04);
+  --shadow-md: 0 4px 12px rgba(40, 30, 10, 0.08), 0 2px 4px rgba(40, 30, 10, 0.04);
+  --shadow-lg: 0 8px 24px rgba(40, 30, 10, 0.1), 0 4px 8px rgba(40, 30, 10, 0.04);
+  --shadow-card: 0 1px 4px rgba(40, 30, 10, 0.06), 0 0 1px rgba(40, 30, 10, 0.08);
+  --shadow-card-hover: 0 8px 24px rgba(40, 30, 10, 0.1), 0 2px 6px rgba(200, 128, 32, 0.08);
+
+  --status-open: #4a7fb0;
+  --status-open-bg: rgba(74, 127, 176, 0.1);
+  --status-in-progress: #b07018;
+  --status-in-progress-bg: rgba(176, 112, 24, 0.1);
+  --status-blocked: #b04830;
+  --status-blocked-bg: rgba(176, 72, 48, 0.1);
+  --status-in-review: #987040;
+  --status-in-review-bg: rgba(152, 112, 64, 0.1);
+  --status-closed: #7a6e5c;
+  --status-closed-bg: rgba(122, 110, 92, 0.1);
+
+  --priority-p0: #b04830;
+  --priority-p0-bg: rgba(176, 72, 48, 0.1);
+  --priority-p1: #c06828;
+  --priority-p1-bg: rgba(192, 104, 40, 0.1);
+  --priority-p2: #b07018;
+  --priority-p2-bg: rgba(176, 112, 24, 0.1);
+  --priority-p3: #7a6e5c;
+  --priority-p3-bg: rgba(122, 110, 92, 0.1);
+  --priority-p4: #a89e8c;
+  --priority-p4-bg: rgba(168, 158, 140, 0.08);
+
+  --gradient-card: linear-gradient(135deg, rgba(200, 128, 32, 0.03) 0%, rgba(152, 112, 64, 0.02) 100%);
+  --gradient-header: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+
+  --grain-opacity: 0;
+}
+
+/* Light Theme — system preference is resolved by JS
+   (sets data-theme="light" when system prefers light and no explicit choice).
+   See layout.html initializer. */

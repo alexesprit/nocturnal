@@ -1,0 +1,121 @@
+/* kanban.css — Kanban board layout: columns, cards, and empty states
+   ================================================================ */
+
+/* ============================================
+   Kanban Board
+   ============================================ */
+.kanban-board {
+  display: flex;
+  gap: 0.85rem;
+  overflow-x: auto;
+  align-items: flex-start;
+  padding-bottom: 0.4rem;
+}
+
+.kanban-column {
+  min-width: 210px;
+  flex: 1 1 230px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  gap: 0.4rem;
+  background: var(--bg-secondary);
+}
+
+.kanban-column-title {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.kanban-count {
+  font-size: 0.65rem;
+  border-radius: var(--radius-pill);
+}
+
+.kanban-card {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  margin: 0.4rem;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  transition: transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth), border-color 0.2s var(--ease-smooth);
+}
+
+.kanban-card:last-child {
+  margin-bottom: 0.4rem;
+}
+
+.kanban-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+.kanban-card-id {
+  margin-bottom: 0.3rem;
+}
+
+.kanban-card-id code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+  border: none;
+}
+
+.kanban-card-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin-bottom: 0.4rem;
+}
+
+.kanban-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.kanban-card-type {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kanban-card-labels {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+
+.kanban-empty {
+  padding: 1.2rem 0.85rem;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  text-align: center;
+}

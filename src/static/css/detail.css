@@ -1,0 +1,277 @@
+/* detail.css — Issue detail page: header, metadata, markdown content, comments
+   ================================================================ */
+
+/* ============================================
+   Issue Detail Page
+   ============================================ */
+main > header {
+  border: none;
+  background: none;
+  margin-bottom: 1.6rem;
+  padding: 0;
+}
+
+main > header h1 {
+  margin-bottom: 0.6rem;
+}
+
+main > header p small {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+main > header p {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+main > header p span {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+main > header p code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--bg-tertiary);
+  padding: 0.12em 0.35em;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+/* Sections in issue detail */
+main > section {
+  margin-bottom: 1.6rem;
+}
+
+/* Metadata definition list inside card */
+.metadata-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 1.2rem;
+  box-shadow: var(--shadow-card);
+}
+
+main > section > dl {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 0;
+  font-size: 0.88rem;
+}
+
+main > section > dl dt {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  padding: 0.25rem 0;
+}
+
+main > section > dl dd {
+  color: var(--text-primary);
+  padding: 0.25rem 0;
+  margin: 0;
+}
+
+/* Markdown Content */
+.markdown {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  font-family: var(--font-display);
+  text-transform: none;
+  letter-spacing: -0.02em;
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0.4rem;
+  color: var(--text-primary);
+}
+
+.markdown h1 { font-size: 1.4rem; }
+.markdown h2 { font-size: 1.15rem; }
+.markdown h3 { font-size: 1rem; }
+
+.markdown p {
+  margin-bottom: 0.6rem;
+  color: var(--text-secondary);
+}
+
+.markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 1.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.markdown ul { list-style: disc; }
+.markdown ol { list-style: decimal; }
+
+.markdown li {
+  padding: 0.12rem 0;
+  border-bottom: none;
+}
+
+.markdown li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1rem;
+}
+
+.markdown li > input[type="checkbox"] {
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  pointer-events: none;
+  accent-color: var(--accent);
+}
+
+.markdown li > ul,
+.markdown li > ol {
+  margin-bottom: 0;
+}
+
+.markdown blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 0.3rem 1rem;
+  margin: 0 0 0.6rem 0;
+  color: var(--text-tertiary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--accent-subtle);
+}
+
+.markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--bg-tertiary);
+  padding: 0.12em 0.35em;
+  border-radius: var(--radius-sm);
+  border: none;
+}
+
+.markdown pre {
+  margin-bottom: 0.6rem;
+  padding: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.markdown pre code {
+  display: block;
+  padding: 1rem;
+  overflow-x: auto;
+  border: none;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.markdown a {
+  color: var(--accent);
+}
+
+.markdown a:hover {
+  color: var(--text-primary);
+}
+
+.markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.markdown table {
+  margin-bottom: 0.6rem;
+}
+
+.markdown strong {
+  color: var(--text-primary);
+}
+
+/* Description / Acceptance Criteria */
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-card);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+}
+
+/* Lists in issue detail */
+main > section > ul {
+  list-style: none;
+  padding: 0;
+}
+
+main > section > ul li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+main > section > ul li:last-child {
+  border-bottom: none;
+}
+
+main > section > ul li a {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  margin-right: 0.4rem;
+}
+
+/* Comments — card style */
+main > section > article {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-left: 3px solid var(--accent);
+  padding: 1rem 1.2rem;
+  margin-bottom: 0.6rem;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  box-shadow: var(--shadow-sm);
+}
+
+main > section > article header {
+  border: none;
+  background: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+main > section > article header strong {
+  font-size: 0.88rem;
+  font-family: var(--font-display);
+}
+
+main > section > article header small {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+main > section > article pre {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-radius: 0;
+}

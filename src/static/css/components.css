@@ -1,0 +1,364 @@
+/* components.css — Reusable UI components: badges, filter bar, copy button, header actions, view toggle
+   ================================================================ */
+
+/* ============================================
+   Error Notice
+   ============================================ */
+.notice-error {
+  color: var(--priority-p0);
+  background: var(--priority-p0-bg);
+  border-left: 3px solid var(--priority-p0);
+  padding: 0.7rem 1rem;
+  font-size: 0.85rem;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* ============================================
+   Badges: Shared
+   ============================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2em 0.65em;
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: none;
+  line-height: 1.5;
+  border-radius: var(--radius-pill);
+}
+
+/* Status Badges — soft pill style */
+.badge-status {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.badge-status-open {
+  background: var(--status-open-bg);
+  color: var(--status-open);
+}
+
+.badge-status-in_progress {
+  background: var(--status-in-progress-bg);
+  color: var(--status-in-progress);
+}
+
+.badge-status-blocked {
+  background: var(--status-blocked-bg);
+  color: var(--status-blocked);
+}
+
+.badge-status-in_review {
+  background: var(--status-in-review-bg);
+  color: var(--status-in-review);
+}
+
+.badge-status-closed {
+  background: var(--status-closed-bg);
+  color: var(--status-closed);
+}
+
+/* Priority Badges */
+.badge-priority {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.badge-priority-P0 {
+  background: var(--priority-p0-bg);
+  color: var(--priority-p0);
+}
+.badge-priority-P1 {
+  background: var(--priority-p1-bg);
+  color: var(--priority-p1);
+}
+.badge-priority-P2 {
+  background: var(--priority-p2-bg);
+  color: var(--priority-p2);
+}
+.badge-priority-P3 {
+  background: var(--priority-p3-bg);
+  color: var(--priority-p3);
+}
+.badge-priority-P4 {
+  background: var(--priority-p4-bg);
+  color: var(--priority-p4);
+  opacity: 0.7;
+}
+
+/* Priority Select */
+.priority-select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+}
+
+.priority-select {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: inherit;
+  padding: 0.2em 0.65em;
+  outline: none;
+  border-radius: var(--radius-pill);
+}
+
+/* ============================================
+   Filter Bar
+   ============================================ */
+form fieldset[role="group"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  border: none;
+  padding: 0;
+  margin-bottom: 1.2rem;
+}
+
+form fieldset[role="group"] select,
+form fieldset[role="group"] input {
+  flex: 1;
+  min-width: 130px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth), background 0.2s var(--ease-smooth);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+form fieldset[role="group"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a89e8c' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+}
+
+form fieldset[role="group"] select:focus,
+form fieldset[role="group"] input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  background: var(--bg-secondary);
+}
+
+form fieldset[role="group"] input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ============================================
+   Copy Button
+   ============================================ */
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  transition: color 0.2s var(--ease-smooth);
+  line-height: 0;
+  border-radius: var(--radius-sm);
+}
+
+.copy-btn:hover {
+  color: var(--accent);
+}
+
+.copy-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.copy-btn .copy-check { display: none; }
+.copy-btn.copy-btn-copied { color: var(--status-open); }
+.copy-btn.copy-btn-copied .copy-icon { display: none; }
+.copy-btn.copy-btn-copied .copy-check { display: inline; }
+
+/* ============================================
+   Nocturnal Badges
+   ============================================ */
+.badge-noc {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.badge-noc-implementing {
+  background: var(--status-in-progress-bg);
+  color: var(--status-in-progress);
+}
+.badge-noc-reviewing {
+  background: var(--status-in-review-bg);
+  color: var(--status-in-review);
+}
+.badge-noc-blocked {
+  background: var(--status-blocked-bg);
+  color: var(--status-blocked);
+}
+.badge-noc-proposal-pending {
+  background: var(--status-in-review-bg);
+  color: var(--status-in-review);
+}
+.badge-noc-proposal-ready {
+  background: var(--status-open-bg);
+  color: var(--status-open);
+}
+.badge-noc-idle {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+.badge-noc-running {
+  background: var(--status-in-progress-bg);
+  color: var(--status-in-progress);
+}
+.badge-noc-stale {
+  background: var(--status-blocked-bg);
+  color: var(--status-blocked);
+}
+
+/* ============================================
+   Header Actions (Rotate / Develop buttons)
+   ============================================ */
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-action {
+  background: var(--accent-subtle);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+  font-family: var(--font-body);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  transition: background 0.2s var(--ease-smooth), border-color 0.2s var(--ease-smooth), transform 0.15s var(--ease-smooth);
+  white-space: nowrap;
+}
+
+.btn-action:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.btn-action:active {
+  transform: translateY(0);
+}
+
+.btn-action.htmx-request {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+.action-feedback {
+  font-size: 0.82rem;
+}
+
+.theme-toggle {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  transition: color 0.2s var(--ease-smooth), border-color 0.2s var(--ease-smooth), background 0.2s var(--ease-smooth);
+}
+
+.theme-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ============================================
+   View Toggle (Table / Kanban)
+   ============================================ */
+.filters-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+}
+
+.filters-bar form {
+  flex: 1;
+  min-width: 0;
+}
+
+.filters-bar form fieldset[role="group"] {
+  margin-bottom: 0;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.view-btn {
+  background: var(--bg-card);
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.82rem;
+  font-family: var(--font-body);
+  font-weight: 500;
+  transition: color 0.2s var(--ease-smooth), background 0.2s var(--ease-smooth);
+  white-space: nowrap;
+}
+
+.view-btn:last-child {
+  border-right: none;
+}
+
+.view-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.view-btn-active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}

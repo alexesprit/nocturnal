@@ -1,0 +1,74 @@
+/* layout.css — Sticky glass header, nav, and main container
+   ================================================================ */
+
+/* ============================================
+   Layout: Header — frosted glass
+   ============================================ */
+header > nav {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0.85rem 2rem;
+  font-size: 0.85rem;
+}
+
+header > nav > a:first-child {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  font-size: 0.95rem;
+}
+
+header > nav > a:first-child::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+header > nav > a {
+  color: var(--text-secondary);
+  transition: color 0.2s var(--ease-smooth);
+}
+
+header > nav > a:hover {
+  color: var(--accent);
+}
+
+header > nav > .separator {
+  color: var(--text-tertiary);
+  font-weight: 400;
+  opacity: 0.5;
+}
+
+header > nav > span:last-child {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+body > header {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* ============================================
+   Layout: Main — 20% more compact
+   ============================================ */
+main {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 1.6rem 2rem;
+}

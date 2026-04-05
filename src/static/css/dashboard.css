@@ -1,0 +1,251 @@
+/* dashboard.css — Project grid, orchestrator status, noc status, activity sections
+   ================================================================ */
+
+/* ============================================
+   Dashboard: Page Title
+   ============================================ */
+main > h1 {
+  margin-bottom: 1.6rem;
+  position: relative;
+  display: inline-block;
+}
+
+main > h1::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  width: 36px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+/* ============================================
+   Dashboard: Project Grid
+   ============================================ */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 0.85rem;
+}
+
+.project-grid article {
+  background: var(--bg-card);
+  background-image: var(--gradient-card);
+  padding: 1.2rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.25s var(--ease-smooth), box-shadow 0.25s var(--ease-smooth), border-color 0.25s var(--ease-smooth);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.project-grid article:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
+}
+
+.project-grid article header {
+  border: none;
+  background: none;
+  margin-bottom: 0.85rem;
+}
+
+.project-grid article header h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+  font-family: var(--font-display);
+}
+
+.project-grid article header h3 a {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.project-grid article header h3 a:hover {
+  color: var(--accent);
+}
+
+.project-grid article header p {
+  margin: 0;
+}
+
+/* Definition list for counts */
+.project-grid dl {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto auto;
+  grid-auto-flow: column;
+  gap: 0;
+  margin: 0;
+  flex: 1;
+}
+
+.project-grid dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  padding: 0.4rem 0 0 0;
+}
+
+.project-grid dd {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 0 0 0.4rem 0;
+  margin: 0;
+}
+
+.project-grid article > p:last-child {
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+.project-grid article > p:last-child strong {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+/* ============================================
+   Orchestrator Status Section — Card
+   ============================================ */
+.orchestrator-status {
+  background: var(--bg-card);
+  background-image: var(--gradient-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 1.2rem 1.4rem;
+  margin-bottom: 1.6rem;
+  box-shadow: var(--shadow-card);
+}
+
+.action-feedback-ok      { color: var(--status-open); }
+.action-feedback-running { color: var(--text-secondary); }
+.action-feedback-error   { color: var(--status-blocked); }
+
+.orchestrator-status h2 {
+  margin-bottom: 0.6rem;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.orchestrator-status h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin: 1rem 0 0.5rem 0;
+}
+
+.orchestrator-dl {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  font-size: 0.88rem;
+}
+
+.orchestrator-dl dt {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.orchestrator-dl dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+}
+
+.next-task-dd {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.next-task-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Recent Activity section (below project grid) */
+.recent-activity {
+  margin-top: 1.6rem;
+}
+
+.recent-activity h2 {
+  margin-bottom: 0.6rem;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* ============================================
+   Noc Status in Project Card
+   ============================================ */
+.noc-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.noc-status small {
+  font-size: 0.7rem;
+}
+
+.noc-counts {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+.noc-counts dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.noc-counts dd {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ============================================
+   Recently Closed
+   ============================================ */
+.recently-closed {
+  margin-top: 1.6rem;
+}
