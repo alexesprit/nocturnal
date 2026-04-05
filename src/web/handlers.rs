@@ -457,6 +457,55 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
     }
 }
 
+pub async fn develop_task_now(
+    State(state): State<Arc<AppState>>,
+    Path((name, id)): Path<(String, String)>,
+) -> Response {
+    if !is_valid_issue_id(&id) {
+        return (StatusCode::BAD_REQUEST, "invalid issue id").into_response();
+    }
+
+    let Some(entry) = state.find_project(&name) else {
+        return (StatusCode::NOT_FOUND, "project not found").into_response();
+    };
+
+    let slug = crate::config::project_slug(&entry.path);
+    let lock_dir_for_check = state.lock_dir.clone();
+    let lock_status =
+        tokio::task::spawn_blocking(move || check_lock_status(&lock_dir_for_check, &slug))
+            .await
+            .unwrap_or(LockStatus::Idle);
+    let project_path = entry.path.clone();
+
+    if matches!(lock_status, LockStatus::Running(_)) {
+        return Html(FEEDBACK_HTML_DEVELOP_RUNNING).into_response();
+    }
+
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(e) => {
+            error!("failed to get current exe: {e}");
+            return Html(FEEDBACK_HTML_FAILED_TO_START).into_response();
+        }
+    };
+
+    match std::process::Command::new(&exe)
+        .args(["develop", "--project"])
+        .arg(&project_path)
+        .args(["--task", &id])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(_child) => Html(FEEDBACK_HTML_DEVELOP_TRIGGERED).into_response(),
+        Err(e) => {
+            error!("failed to spawn run for {name}/{id}: {e}");
+            Html(FEEDBACK_HTML_FAILED_TO_START).into_response()
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub struct PriorityForm {
     priority: String,

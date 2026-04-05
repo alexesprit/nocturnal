@@ -46,6 +46,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/rotate", post(handlers::rotate_now))
         .route("/api/projects/{name}/develop", post(handlers::develop_now))
         .route(
+            "/api/projects/{name}/issues/{id}/develop",
+            post(handlers::develop_task_now),
+        )
+        .route(
             "/api/projects/{name}/issues/{id}/priority",
             post(handlers::update_priority),
         )
