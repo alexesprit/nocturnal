@@ -83,6 +83,10 @@ Each project can have a `.nocturnal.toml` in its root. Top-level fields:
 - `target_branch` — branch to open proposals against or merge into (default: same as `base_branch`).
 - `merge_strategy` — local merge strategy: `"ff"`, `"no-ff"`, or `"rebase"`. Defaults to `"rebase"` for `mode = "local"`, otherwise `"ff"`.
 
+`[hooks]` section:
+- `pre_merge` — list of shell commands to run before merging (default: empty)
+- `post_merge` — list of shell commands to run after merging (default: empty)
+
 ## Prompt Extras
 
 Prompt content can be extended per project without modifying the built-in templates. Place files in `.nocturnal/` at the project root:

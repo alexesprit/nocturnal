@@ -259,11 +259,20 @@ Each project can have a `.nocturnal.toml` in its root:
 # AI backend: "claude" (default) or "codex"
 provider = "claude"
 
+# Override provider for implement/develop operations (optional, falls back to provider)
+implement_provider = "codex"
+
+# Override provider for review/proposal-review operations (optional, falls back to provider)
+review_provider = "claude"
+
 # Max review cycles before blocking a task for human attention (default: 3)
 max_reviews = 3
 
 # Max USD budget per Claude run; omit for no limit (default: unlimited)
 max_budget = 10
+
+# When false, develop --all, proposal --all, and loop --all skip this project (default: true)
+auto_develop = true
 
 [claude]
 # Default model for all operations (default: "sonnet")
@@ -313,6 +322,13 @@ auto_merge = false
 
 # Delete the remote branch after a proposal is merged (default: false)
 delete_branch_on_merge = false
+
+[hooks]
+# Shell commands to run before merging (default: empty)
+pre_merge = ["npm test", "npm run lint"]
+
+# Shell commands to run after merging (default: empty)
+post_merge = ["echo 'Merged!'"]
 ```
 
 ## Task Lifecycle
