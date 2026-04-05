@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use tracing::{error, info, warn};
 
@@ -60,6 +62,7 @@ pub fn implement_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         project: &slug,
         task_id,
         model: &ctx.settings.implement_model,
+        timeout: Duration::from_secs(ctx.settings.max_runtime_secs),
     })? {
         info!("Implementation completed");
         // Link changed files to the task (best-effort)

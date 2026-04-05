@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use tracing::{error, info};
 
@@ -64,6 +66,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
         project: &slug,
         task_id,
         model: &ctx.settings.review_model,
+        timeout: Duration::from_secs(ctx.settings.max_runtime_secs),
     })? {
         error!("Review failed (exit code nonzero)");
         return Ok(false);

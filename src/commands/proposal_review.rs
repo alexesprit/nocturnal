@@ -167,6 +167,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             project: &slug,
             task_id: &task_id,
             model: &ctx.settings.review_model,
+            timeout: Duration::from_secs(ctx.settings.max_runtime_secs),
         })? {
             info!("Proposal review completed");
         } else {

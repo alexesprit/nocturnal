@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 pub const DEFAULT_MAX_REVIEWS: u32 = 3;
 pub const DEFAULT_MAX_BUDGET: Option<u32> = None;
+pub const DEFAULT_MAX_RUNTIME_SECS: u64 = 1800;
 pub const DEFAULT_MODEL: &str = "sonnet";
 pub const DEFAULT_CODEX_MODEL: &str = "gpt-5.4";
 pub const DEFAULT_CODEX_REASONING_EFFORT: &str = "high";
@@ -77,6 +78,7 @@ struct ProjectConfig {
     hooks: Option<HooksConfig>,
     max_reviews: Option<u32>,
     max_budget: Option<u32>,
+    max_runtime_secs: Option<u64>,
     auto_develop: Option<bool>,
     provider: Option<Provider>,
     implement_provider: Option<Provider>,
@@ -95,6 +97,7 @@ pub struct ProjectSettings {
     pub merge_strategy: MergeStrategy,
     pub max_reviews: u32,
     pub max_budget: Option<u32>,
+    pub max_runtime_secs: u64,
     pub auto_develop: bool,
     #[allow(dead_code)]
     pub provider: Provider,
@@ -211,6 +214,7 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                 merge_strategy,
                 max_reviews: f.max_reviews.unwrap_or(DEFAULT_MAX_REVIEWS),
                 max_budget: f.max_budget.or(DEFAULT_MAX_BUDGET),
+                max_runtime_secs: f.max_runtime_secs.unwrap_or(DEFAULT_MAX_RUNTIME_SECS),
                 auto_develop: f.auto_develop.unwrap_or(true),
                 provider,
                 implement_provider,
@@ -240,6 +244,7 @@ impl Default for ProjectSettings {
             merge_strategy: MergeStrategy::default(),
             max_reviews: DEFAULT_MAX_REVIEWS,
             max_budget: DEFAULT_MAX_BUDGET,
+            max_runtime_secs: DEFAULT_MAX_RUNTIME_SECS,
             auto_develop: true,
             provider: Provider::default(),
             implement_provider: Provider::default(),
@@ -762,6 +767,29 @@ mod tests {
     fn parse_provider_codex() {
         let f: ProjectConfig = toml::from_str("provider = \"codex\"").unwrap();
         assert_eq!(f.provider.unwrap(), Provider::Codex);
+    }
+
+    #[test]
+    fn parse_max_runtime_secs() {
+        let f: ProjectConfig = toml::from_str("max_runtime_secs = 3600").unwrap();
+        assert_eq!(f.max_runtime_secs.unwrap(), 3600);
+    }
+
+    #[test]
+    fn max_runtime_secs_defaults_to_1800() {
+        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        assert_eq!(settings.max_runtime_secs, DEFAULT_MAX_RUNTIME_SECS);
+    }
+
+    #[test]
+    fn load_settings_max_runtime_secs() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        write!(f, "max_runtime_secs = 900\n").unwrap();
+        let settings = load_project_settings(dir.path());
+        assert_eq!(settings.max_runtime_secs, 900);
     }
 
     #[test]

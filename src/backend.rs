@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use tracing::{info, warn};
@@ -29,6 +30,7 @@ pub struct RunParams<'a> {
     pub project: &'a str,
     pub task_id: &'a str,
     pub model: &'a str,
+    pub timeout: Duration,
 }
 
 pub trait AiBackend {
@@ -47,16 +49,34 @@ pub trait AiBackend {
         let stderr_file = output_file.try_clone()?;
 
         let mut cmd = self.build_command(params)?;
-        let status = cmd
+        let mut child = cmd
             .current_dir(params.wt_path)
             .stdout(output_file)
             .stderr(stderr_file)
-            .status()
+            .spawn()
             .context("Failed to run AI backend")?;
+
+        let deadline = timer + params.timeout;
+        let success = loop {
+            match child.try_wait().context("Failed to wait for AI backend")? {
+                Some(status) => break status.success(),
+                None => {
+                    if Instant::now() >= deadline {
+                        warn!(
+                            "AI backend timed out after {}s, killing process",
+                            params.timeout.as_secs()
+                        );
+                        child.kill().ok();
+                        child.wait().ok();
+                        break false;
+                    }
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }
+        };
 
         let elapsed = timer.elapsed();
         let finished_at = chrono::Local::now();
-        let success = status.success();
 
         let log_dir = params.log_file.parent().unwrap_or_else(|| Path::new("."));
         activity::record(
