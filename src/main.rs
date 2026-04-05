@@ -15,7 +15,7 @@ mod web;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use tracing::error;
+use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
@@ -155,20 +155,30 @@ fn run(cli: Cli) -> Result<()> {
         Command::Web { port, addr } => commands::web::run(&cfg, &addr, port),
         Command::Develop { path, all, task } => {
             if all {
+                info!(
+                    "Mode: all projects ({} configured)",
+                    cfg.projects_list().len()
+                );
                 commands::rotate::run(&cfg)
             } else {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
+                info!("Project: {}", root.display());
                 let ctx = config::ProjectContext::new(cfg, root);
                 commands::run::run(&ctx, task.as_deref())
             }
         }
         Command::Proposal { path, all } => {
             if all {
+                info!(
+                    "Mode: all projects ({} configured)",
+                    cfg.projects_list().len()
+                );
                 commands::proposal_review_rotate::run(&cfg)
             } else {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
+                info!("Project: {}", root.display());
                 let ctx = config::ProjectContext::new(cfg, root);
                 commands::proposal_review::run(&ctx)
             }
@@ -179,16 +189,25 @@ fn run(cli: Cli) -> Result<()> {
             max_iterations,
         } => {
             if all {
+                info!(
+                    "Mode: all projects ({} configured)",
+                    cfg.projects_list().len()
+                );
                 commands::loop_cmd::run(&cfg, max_iterations)
             } else {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
+                info!("Project: {}", root.display());
                 let ctx = config::ProjectContext::new(cfg, root);
                 commands::loop_cmd::run_single(&ctx, max_iterations)
             }
         }
         Command::Gc { path, all } => {
             if all {
+                info!(
+                    "Mode: all projects ({} configured)",
+                    cfg.projects_list().len()
+                );
                 use std::path::PathBuf;
                 use tracing::warn;
                 // Run lock cleanup once before the project loop
@@ -215,6 +234,7 @@ fn run(cli: Cli) -> Result<()> {
             } else {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
+                info!("Project: {}", root.display());
                 let ctx = config::ProjectContext::new(cfg, root);
                 commands::gc::run(&ctx)
             }
