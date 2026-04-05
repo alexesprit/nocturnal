@@ -19,6 +19,14 @@ pub fn run(ctx: &ProjectContext) -> Result<()> {
     Ok(())
 }
 
+pub fn run_worktrees_only(ctx: &ProjectContext) -> Result<usize> {
+    gc_worktrees(ctx)
+}
+
+pub fn run_locks_only(ctx: &ProjectContext) -> Result<usize> {
+    gc_stale_locks(&ctx.cfg.lock_dir)
+}
+
 fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
     let entries = git::list_nocturnal_worktrees(&ctx.project_root)?;
     let td = td::Td::new(&ctx.project_root);

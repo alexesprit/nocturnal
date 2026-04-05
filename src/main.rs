@@ -71,7 +71,13 @@ enum Command {
         max_iterations: Option<usize>,
     },
     /// Remove worktrees for completed/blocked tasks and clean stale locks
-    Gc,
+    Gc {
+        /// Project directory (default: current directory)
+        path: Option<String>,
+        /// Run across all configured projects
+        #[arg(long)]
+        all: bool,
+    },
     /// Start a read-only web dashboard for td-managed projects
     Web {
         /// Server listen port
@@ -181,10 +187,37 @@ fn run(cli: Cli) -> Result<()> {
                 commands::loop_cmd::run_single(&ctx, max_iterations)
             }
         }
-        Command::Gc => {
-            config::check_td_init(&default_root)?;
-            let ctx = config::ProjectContext::new(cfg, default_root);
-            commands::gc::run(&ctx)
+        Command::Gc { path, all } => {
+            if all {
+                use std::path::PathBuf;
+                use tracing::warn;
+                // Run lock cleanup once before the project loop
+                let lock_ctx = config::ProjectContext::new(cfg.clone(), default_root.clone());
+                let locks_removed = commands::gc::run_locks_only(&lock_ctx)?;
+                let mut total_worktrees = 0usize;
+                let mut project_count = 0usize;
+                for project in cfg.projects_list() {
+                    let root = PathBuf::from(&project);
+                    if !root.join(".todos").is_dir() {
+                        warn!("gc: skipping {project} (no .todos/ found)");
+                        continue;
+                    }
+                    let ctx = config::ProjectContext::new(cfg.clone(), root);
+                    let removed = commands::gc::run_worktrees_only(&ctx)?;
+                    println!("gc [{project}]: {removed} worktree(s) removed");
+                    total_worktrees += removed;
+                    project_count += 1;
+                }
+                println!(
+                    "gc: {total_worktrees} worktree(s) removed across {project_count} project(s), {locks_removed} stale lock(s) cleaned"
+                );
+                Ok(())
+            } else {
+                let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
+                config::check_td_init(&root)?;
+                let ctx = config::ProjectContext::new(cfg, root);
+                commands::gc::run(&ctx)
+            }
         }
     }
 }
