@@ -531,6 +531,34 @@ pub async fn update_priority(
 
     let path = entry.path.clone();
     let issue_id = id.clone();
+
+    let status_result = tokio::task::spawn_blocking(move || {
+        let td = Td::new(&path);
+        td.show(&issue_id).map(|t| t.status)
+    })
+    .await;
+
+    match status_result {
+        Ok(Ok(ref status)) if status == "closed" => {
+            return (
+                StatusCode::FORBIDDEN,
+                "cannot update priority of a closed task",
+            )
+                .into_response();
+        }
+        Ok(Err(e)) => {
+            error!("show failed for {name}/{id}: {e}");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "failed to fetch task").into_response();
+        }
+        Err(e) => {
+            error!("task join error: {e}");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response();
+        }
+        Ok(Ok(_)) => {}
+    }
+
+    let path = entry.path.clone();
+    let issue_id = id.clone();
     let priority_clone = priority.clone();
     let result = tokio::task::spawn_blocking(move || {
         let td = Td::new(&path);

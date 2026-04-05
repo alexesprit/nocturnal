@@ -18,6 +18,9 @@
     <p>
         <code>{{ issue.id }}</code><button class="copy-btn" data-copy="{{ issue.id }}" type="button" aria-label="Copy task ID"><i data-lucide="copy" class="copy-icon"></i><i data-lucide="check" class="copy-check"></i></button>
         <span class="badge badge-status badge-status-{{ issue.status }}">{{ issue.status }}</span>
+        {% if issue.status == "closed" %}
+        <span class="badge badge-priority badge-priority-{{ issue.priority }}">{{ issue.priority }}</span>
+        {% else %}
         <span class="priority-select-wrapper badge badge-priority badge-priority-{{ issue.priority }}" id="priority-select-{{ issue.id }}">
             <select class="priority-select"
                 hx-post="/api/projects/{{ project_name }}/issues/{{ issue.id }}/priority"
@@ -30,6 +33,7 @@
                 {% endfor %}
             </select>
         </span>
+        {% endif %}
         {% if let Some(noc) = noc_state %}
         <span class="badge badge-noc badge-noc-{{ noc.badge.css_class }}">{{ noc.badge.text }}</span>
         {% endif %}
