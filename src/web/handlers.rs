@@ -406,7 +406,7 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
     };
 
     match std::process::Command::new(&exe)
-        .arg("develop-rotate")
+        .args(["develop", "--all"])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
