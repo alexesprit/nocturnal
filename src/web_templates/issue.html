@@ -196,6 +196,29 @@
     </table>
 </section>
 {% endif %}
+{% if !files.is_empty() %}
+<section>
+    <h2>Linked Files</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>File</th>
+                <th>Role</th>
+                <th>Linked At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for file in files %}
+            <tr data-href="vscode://file/{{ project_path }}/{{ file.file_path }}" tabindex="0" role="link">
+                <td><code>{{ file.file_path }}</code></td>
+                <td>{{ file.role }}</td>
+                <td>{{ file.linked_at|format_datetime }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
 <script>
     document.addEventListener("click", function(e) {
         var btn = e.target.closest(".copy-btn");

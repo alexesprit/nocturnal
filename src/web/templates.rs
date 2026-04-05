@@ -4,7 +4,7 @@ use axum::response::{Html, IntoResponse, Response};
 use tracing::error;
 
 use super::models::{IssueDetail, NocIssueState, OrchestratorStatus, ProjectStatus};
-use crate::td::Task;
+use crate::td::{LinkedFile, Task};
 
 pub(super) struct Breadcrumb {
     pub(super) label: String,
@@ -51,6 +51,8 @@ pub(super) struct IssueTemplate {
     pub(super) project_name: String,
     pub(super) issue: IssueDetail,
     pub(super) noc_state: Option<NocIssueState>,
+    pub(super) files: Vec<LinkedFile>,
+    pub(super) project_path: String,
 }
 
 #[derive(Template)]

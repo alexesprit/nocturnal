@@ -330,6 +330,7 @@ pub async fn issue(
         let mut detail = td.show_detail(&issue_id)?;
         detail.depends_on = td.depends_on(&issue_id);
         detail.blocked_by = td.blocked_by(&issue_id);
+        let files = td.files(&issue_id);
         let noc_state = derive_noc_state(
             &detail.labels,
             &detail.status,
@@ -337,12 +338,13 @@ pub async fn issue(
             &path,
             &issue_id,
         );
-        Ok::<_, anyhow::Error>((detail, noc_state))
+        let project_path = path.to_string_lossy().into_owned();
+        Ok::<_, anyhow::Error>((detail, noc_state, files, project_path))
     })
     .await;
 
     match result {
-        Ok(Ok((detail, noc_state))) => into_html_response(IssueTemplate {
+        Ok(Ok((detail, noc_state, files, project_path))) => into_html_response(IssueTemplate {
             title: format!("{} — {}", detail.id, detail.title),
             breadcrumbs: vec![
                 Breadcrumb {
@@ -357,6 +359,8 @@ pub async fn issue(
             project_name,
             issue: detail,
             noc_state,
+            files,
+            project_path,
         }),
         Ok(Err(e)) => {
             let err_str = e.to_string();

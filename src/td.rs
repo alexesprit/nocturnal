@@ -111,6 +111,17 @@ pub struct Comment {
 
 #[allow(dead_code)] // fields used by askama templates
 #[derive(Debug, Deserialize)]
+pub struct LinkedFile {
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub file_path: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub role: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub linked_at: String,
+}
+
+#[allow(dead_code)] // fields used by askama templates
+#[derive(Debug, Deserialize)]
 pub struct ActivityEntry {
     #[serde(rename = "type", default, deserialize_with = "null_as_default")]
     pub action: String,
@@ -315,6 +326,13 @@ impl<'a> Td<'a> {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    pub fn files(&self, issue_id: &str) -> Vec<LinkedFile> {
+        let Ok(json) = self.run(&["files", issue_id, "--json"]) else {
+            return vec![];
+        };
+        serde_json::from_str::<Vec<LinkedFile>>(&json).unwrap_or_default()
     }
 
     pub fn list_by_status(&self, status: &str) -> Result<Vec<Task>> {
