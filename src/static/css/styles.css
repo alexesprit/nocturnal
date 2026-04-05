@@ -823,6 +823,20 @@ main > section > dl dd {
   border-bottom: none;
 }
 
+.markdown li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1rem;
+}
+
+.markdown li > input[type="checkbox"] {
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  pointer-events: none;
+  accent-color: var(--accent);
+}
+
 .markdown li > ul,
 .markdown li > ol {
   margin-bottom: 0;
