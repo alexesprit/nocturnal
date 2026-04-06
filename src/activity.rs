@@ -1,11 +1,11 @@
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 const FILENAME: &str = "activity.jsonl";
-const CAPACITY: usize = 10;
+const CAPACITY: usize = 100;
 
 #[derive(Serialize, Deserialize)]
 pub struct Entry {
@@ -25,20 +25,18 @@ pub fn record(log_dir: &Path, entry: &Entry) {
         return;
     };
 
-    let mut lines: Vec<String> = fs::File::open(&path)
-        .ok()
-        .map(|f| {
-            BufReader::new(f)
-                .lines()
-                .map_while(Result::ok)
-                .filter(|l| !l.is_empty())
-                .collect()
-        })
-        .unwrap_or_default();
-    lines.push(json);
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+        writeln!(file, "{json}").ok();
+    }
 
-    let start = lines.len().saturating_sub(CAPACITY);
-    fs::write(path, lines[start..].join("\n") + "\n").ok();
+    // Periodic truncation: only truncate when file exceeds 2x capacity
+    if let Ok(content) = fs::read_to_string(&path) {
+        let lines: Vec<&str> = content.lines().filter(|l| !l.is_empty()).collect();
+        if lines.len() > CAPACITY * 2 {
+            let start = lines.len().saturating_sub(CAPACITY);
+            fs::write(&path, lines[start..].join("\n") + "\n").ok();
+        }
+    }
 }
 
 pub fn read_recent(log_dir: &Path, limit: usize) -> Vec<Entry> {
@@ -123,7 +121,9 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
 
-        for i in 0..15 {
+        // Write enough entries to trigger truncation (must exceed 2x CAPACITY)
+        let total = CAPACITY * 2 + 10;
+        for i in 0..total {
             record(
                 &dir,
                 &Entry {
@@ -138,12 +138,15 @@ mod tests {
             );
         }
 
-        // File should contain at most CAPACITY entries
+        // File should contain at most CAPACITY entries after truncation
         let all = read_recent(&dir, CAPACITY);
         assert_eq!(all.len(), CAPACITY);
         // Most recent first
-        assert_eq!(all[0].command, "cmd-14");
-        assert_eq!(all[CAPACITY - 1].command, "cmd-5");
+        assert_eq!(all[0].command, format!("cmd-{}", total - 1));
+        assert_eq!(
+            all[CAPACITY - 1].command,
+            format!("cmd-{}", total - CAPACITY)
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
