@@ -10,15 +10,14 @@ use tracing::{error, warn};
 use super::AppState;
 use super::helpers::{
     ALLOWED_PRIORITIES, ALLOWED_SORTS, ALLOWED_STATUSES, ALLOWED_TYPES, ALLOWED_VIEWS,
-    FEEDBACK_HTML_DEVELOP_RUNNING, FEEDBACK_HTML_DEVELOP_TRIGGERED, FEEDBACK_HTML_FAILED_TO_START,
-    FEEDBACK_HTML_ROTATE_RUNNING, FEEDBACK_HTML_ROTATE_TRIGGERED, MAX_QUERY_LEN, check_lock_status,
-    derive_noc_state, fetch_orchestrator_status, fetch_project_status, group_by_status,
-    is_valid_issue_id, priority_select_html, sanitize_param,
+    FEEDBACK_HTML_FAILED_TO_START, MAX_QUERY_LEN, build_project_template, check_lock_status,
+    derive_noc_state, feedback_html, fetch_orchestrator_status, fetch_project_status,
+    group_by_status, is_valid_issue_id, priority_select_html, sanitize_param,
 };
 use super::models::{ListOpts, LockStatus, OrchestratorStatus};
 use super::templates::{
     Breadcrumb, DashboardTemplate, IssueTableErrorTemplate, IssueTemplate, KanbanBoardTemplate,
-    ProjectErrorTemplate, ProjectTemplate, TableWrapperTemplate, into_html_response,
+    ProjectErrorTemplate, TableWrapperTemplate, into_html_response,
 };
 use crate::td::Td;
 
@@ -137,28 +136,7 @@ pub async fn project(
     match active_result {
         Ok(Ok(issues)) => {
             let recently_closed = closed_result.ok().and_then(Result::ok).unwrap_or_default();
-
-            let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
-                let (o, ip, bl, ir) = group_by_status(issues);
-                (Vec::new(), o, ip, bl, ir)
-            } else {
-                (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
-            };
-            into_html_response(ProjectTemplate {
-                title: name.clone(),
-                breadcrumbs: vec![Breadcrumb {
-                    label: name.clone(),
-                    url: None,
-                }],
-                name,
-                view,
-                issues: table_issues,
-                open,
-                in_progress,
-                blocked,
-                in_review,
-                recently_closed,
-            })
+            into_html_response(build_project_template(name, issues, recently_closed, view))
         }
         Ok(Err(e)) => {
             warn!("td list failed for {project_name}: {e}");
@@ -257,28 +235,7 @@ pub async fn project_issues(
                     .and_then(Result::ok)
                     .unwrap_or_default();
 
-                    let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban"
-                    {
-                        let (o, ip, bl, ir) = group_by_status(issues);
-                        (Vec::new(), o, ip, bl, ir)
-                    } else {
-                        (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
-                    };
-                    into_html_response(ProjectTemplate {
-                        title: name.clone(),
-                        breadcrumbs: vec![Breadcrumb {
-                            label: name.clone(),
-                            url: None,
-                        }],
-                        name,
-                        view,
-                        issues: table_issues,
-                        open,
-                        in_progress,
-                        blocked,
-                        in_review,
-                        recently_closed,
-                    })
+                    into_html_response(build_project_template(name, issues, recently_closed, view))
                 }
             }
             Ok(Err(e)) => {
@@ -394,7 +351,7 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
     .unwrap_or(false);
 
     if is_running {
-        return Html(FEEDBACK_HTML_ROTATE_RUNNING).into_response();
+        return Html(feedback_html("Already running", "running")).into_response();
     }
 
     let exe = match std::env::current_exe() {
@@ -412,7 +369,7 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
         .stderr(std::process::Stdio::null())
         .spawn()
     {
-        Ok(_child) => Html(FEEDBACK_HTML_ROTATE_TRIGGERED).into_response(),
+        Ok(_child) => Html(feedback_html("Rotation triggered", "ok")).into_response(),
         Err(e) => {
             error!("failed to spawn rotate: {e}");
             Html(FEEDBACK_HTML_FAILED_TO_START).into_response()
@@ -420,8 +377,12 @@ pub async fn rotate_now(State(state): State<Arc<AppState>>) -> Response {
     }
 }
 
-pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> Response {
-    let Some(entry) = state.find_project(&name) else {
+async fn spawn_develop(
+    state: &Arc<AppState>,
+    project_name: &str,
+    task_id: Option<&str>,
+) -> Response {
+    let Some(entry) = state.find_project(project_name) else {
         return (StatusCode::NOT_FOUND, "project not found").into_response();
     };
 
@@ -434,7 +395,7 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
     let project_path = entry.path.clone();
 
     if matches!(lock_status, LockStatus::Running(_)) {
-        return Html(FEEDBACK_HTML_DEVELOP_RUNNING).into_response();
+        return Html(feedback_html("Already running", "running")).into_response();
     }
 
     let exe = match std::env::current_exe() {
@@ -445,20 +406,32 @@ pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<St
         }
     };
 
-    match std::process::Command::new(&exe)
-        .args(["develop", "--project"])
+    let mut cmd = std::process::Command::new(&exe);
+    cmd.args(["develop", "--project"])
         .arg(&project_path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
-        Ok(_child) => Html(FEEDBACK_HTML_DEVELOP_TRIGGERED).into_response(),
+        .stderr(std::process::Stdio::null());
+
+    if let Some(id) = task_id {
+        cmd.args(["--task", id]);
+    }
+
+    match cmd.spawn() {
+        Ok(_child) => Html(feedback_html("Develop triggered", "ok")).into_response(),
         Err(e) => {
-            error!("failed to spawn run for {name}: {e}");
+            if let Some(id) = task_id {
+                error!("failed to spawn run for {project_name}/{id}: {e}");
+            } else {
+                error!("failed to spawn run for {project_name}: {e}");
+            }
             Html(FEEDBACK_HTML_FAILED_TO_START).into_response()
         }
     }
+}
+
+pub async fn develop_now(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> Response {
+    spawn_develop(&state, &name, None).await
 }
 
 pub async fn develop_task_now(
@@ -468,46 +441,7 @@ pub async fn develop_task_now(
     if !is_valid_issue_id(&id) {
         return (StatusCode::BAD_REQUEST, "invalid issue id").into_response();
     }
-
-    let Some(entry) = state.find_project(&name) else {
-        return (StatusCode::NOT_FOUND, "project not found").into_response();
-    };
-
-    let slug = crate::config::project_slug(&entry.path);
-    let lock_dir_for_check = state.lock_dir.clone();
-    let lock_status =
-        tokio::task::spawn_blocking(move || check_lock_status(&lock_dir_for_check, &slug))
-            .await
-            .unwrap_or(LockStatus::Idle);
-    let project_path = entry.path.clone();
-
-    if matches!(lock_status, LockStatus::Running(_)) {
-        return Html(FEEDBACK_HTML_DEVELOP_RUNNING).into_response();
-    }
-
-    let exe = match std::env::current_exe() {
-        Ok(e) => e,
-        Err(e) => {
-            error!("failed to get current exe: {e}");
-            return Html(FEEDBACK_HTML_FAILED_TO_START).into_response();
-        }
-    };
-
-    match std::process::Command::new(&exe)
-        .args(["develop", "--project"])
-        .arg(&project_path)
-        .args(["--task", &id])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
-        Ok(_child) => Html(FEEDBACK_HTML_DEVELOP_TRIGGERED).into_response(),
-        Err(e) => {
-            error!("failed to spawn run for {name}/{id}: {e}");
-            Html(FEEDBACK_HTML_FAILED_TO_START).into_response()
-        }
-    }
+    spawn_develop(&state, &name, Some(&id)).await
 }
 
 #[derive(Deserialize)]

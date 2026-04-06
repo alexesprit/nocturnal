@@ -32,13 +32,11 @@ pub(super) const MAX_QUERY_LEN: usize = 200;
 
 // --- Inline feedback HTML ---
 
-pub(super) const FEEDBACK_HTML_ROTATE_RUNNING: &str = r#"<span class="action-feedback action-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
-
-pub(super) const FEEDBACK_HTML_ROTATE_TRIGGERED: &str = r#"<span class="action-feedback action-feedback-ok">Rotation triggered</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
-
-pub(super) const FEEDBACK_HTML_DEVELOP_RUNNING: &str = r#"<span class="action-feedback action-feedback-running">Already running</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
-
-pub(super) const FEEDBACK_HTML_DEVELOP_TRIGGERED: &str = r#"<span class="action-feedback action-feedback-ok">Develop triggered</span><script>setTimeout(function(){var f=document.getElementById('action-feedback');if(f)f.innerHTML='';},4000);</script>"#;
+pub(super) fn feedback_html(message: &str, css_class: &str) -> String {
+    format!(
+        r#"<span class="action-feedback action-feedback-{css_class}">{message}</span><script>setTimeout(function(){{var f=document.getElementById('action-feedback');if(f)f.innerHTML='';}},4000);</script>"#
+    )
+}
 
 pub(super) const FEEDBACK_HTML_FAILED_TO_START: &str =
     r#"<span class="action-feedback action-feedback-error">Failed to start</span>"#;
@@ -401,6 +399,37 @@ pub(super) fn find_worktree_for_task(
             Some(format!("nocturnal/{task_id}")),
         ),
         _ => (None, None),
+    }
+}
+
+// --- Template builder helpers ---
+
+pub(super) fn build_project_template(
+    name: String,
+    issues: Vec<Task>,
+    recently_closed: Vec<Task>,
+    view: String,
+) -> super::templates::ProjectTemplate {
+    let (table_issues, open, in_progress, blocked, in_review) = if view == "kanban" {
+        let (o, ip, bl, ir) = group_by_status(issues);
+        (Vec::new(), o, ip, bl, ir)
+    } else {
+        (issues, Vec::new(), Vec::new(), Vec::new(), Vec::new())
+    };
+    super::templates::ProjectTemplate {
+        title: name.clone(),
+        breadcrumbs: vec![super::templates::Breadcrumb {
+            label: name.clone(),
+            url: None,
+        }],
+        name,
+        view,
+        issues: table_issues,
+        open,
+        in_progress,
+        blocked,
+        in_review,
+        recently_closed,
     }
 }
 
