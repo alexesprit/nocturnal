@@ -693,14 +693,45 @@ impl NextAction {
     }
 }
 
+impl Task {
+    pub fn review_count(&self) -> u32 {
+        label_review_count(&self.labels).unwrap_or(0)
+    }
+
+    pub fn proposal_id(&self) -> Option<&str> {
+        label_proposal_id(&self.labels)
+    }
+
+    pub fn has_proposal_ready(&self) -> bool {
+        label_has_proposal_ready(&self.labels)
+    }
+
+    pub fn has_noc_labels(&self) -> bool {
+        self.labels.iter().any(|l| l.starts_with("noc-"))
+    }
+}
+
 // --- Label helpers ---
 
-pub fn get_review_count(task: &Task) -> u32 {
-    task.labels
+/// Returns the parsed `noc-reviews:N` count from a label slice, or `None` if absent.
+pub fn label_review_count(labels: &[String]) -> Option<u32> {
+    labels
         .iter()
-        .find_map(|l| l.strip_prefix("noc-reviews:"))
-        .and_then(|n| n.parse().ok())
-        .unwrap_or(0)
+        .find_map(|l| l.strip_prefix("noc-reviews:").and_then(|n| n.parse().ok()))
+}
+
+/// Returns the proposal ID from a `noc-proposal:<id>` label, or `None` if absent.
+pub fn label_proposal_id(labels: &[String]) -> Option<&str> {
+    labels.iter().find_map(|l| l.strip_prefix("noc-proposal:"))
+}
+
+/// Returns true if a `noc-proposal-ready` label is present.
+pub fn label_has_proposal_ready(labels: &[String]) -> bool {
+    labels.iter().any(|l| l == "noc-proposal-ready")
+}
+
+pub fn get_review_count(task: &Task) -> u32 {
+    task.review_count()
 }
 
 pub fn build_labels_with_review_count(task: &Task, count: u32) -> String {
@@ -780,36 +811,64 @@ mod tests {
         }
     }
 
-    // --- get_review_count ---
+    // --- Task::review_count ---
 
     #[test]
-    fn get_review_count_returns_zero_when_no_label() {
+    fn review_count_returns_zero_when_no_label() {
         let task = task_with_labels(&["bug", "urgent"]);
-        assert_eq!(get_review_count(&task), 0);
+        assert_eq!(task.review_count(), 0);
     }
 
     #[test]
-    fn get_review_count_returns_zero_for_empty_labels() {
+    fn review_count_returns_zero_for_empty_labels() {
         let task = task_with_labels(&[]);
-        assert_eq!(get_review_count(&task), 0);
+        assert_eq!(task.review_count(), 0);
     }
 
     #[test]
-    fn get_review_count_parses_label() {
+    fn review_count_parses_label() {
         let task = task_with_labels(&["noc-reviews:2", "bug"]);
-        assert_eq!(get_review_count(&task), 2);
+        assert_eq!(task.review_count(), 2);
     }
 
     #[test]
-    fn get_review_count_returns_zero_for_malformed_value() {
+    fn review_count_returns_zero_for_malformed_value() {
         let task = task_with_labels(&["noc-reviews:abc"]);
-        assert_eq!(get_review_count(&task), 0);
+        assert_eq!(task.review_count(), 0);
     }
 
     #[test]
-    fn get_review_count_returns_zero_for_empty_value() {
+    fn review_count_returns_zero_for_empty_value() {
         let task = task_with_labels(&["noc-reviews:"]);
-        assert_eq!(get_review_count(&task), 0);
+        assert_eq!(task.review_count(), 0);
+    }
+
+    // --- Task::proposal_id ---
+
+    #[test]
+    fn proposal_id_returns_none_when_no_label() {
+        let task = task_with_labels(&["bug", "urgent"]);
+        assert_eq!(task.proposal_id(), None);
+    }
+
+    #[test]
+    fn proposal_id_returns_id_from_label() {
+        let task = task_with_labels(&["noc-proposal:42", "bug"]);
+        assert_eq!(task.proposal_id(), Some("42"));
+    }
+
+    // --- Task::has_proposal_ready ---
+
+    #[test]
+    fn has_proposal_ready_returns_false_when_absent() {
+        let task = task_with_labels(&["noc-proposal:42", "bug"]);
+        assert!(!task.has_proposal_ready());
+    }
+
+    #[test]
+    fn has_proposal_ready_returns_true_when_present() {
+        let task = task_with_labels(&["noc-proposal-ready", "bug"]);
+        assert!(task.has_proposal_ready());
     }
 
     // --- build_labels_with_review_count ---

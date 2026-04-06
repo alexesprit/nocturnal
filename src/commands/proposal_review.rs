@@ -47,9 +47,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
 
         let task = td_client.show(&task_id)?;
         let proposal_id = task
-            .labels
-            .iter()
-            .find_map(|l| l.strip_prefix("noc-proposal:"))
+            .proposal_id()
             .ok_or_else(|| anyhow::anyhow!("Could not extract proposal ID for {task_id}"))?
             .to_string();
 
@@ -75,7 +73,7 @@ pub fn run_unlocked(ctx: &ProjectContext) -> Result<bool> {
             }
             vcs::ProposalState::Closed => {
                 info!("Proposal #{proposal_id} closed without merge — rejecting task");
-                let new_count = td::get_review_count(&task) + 1;
+                let new_count = task.review_count() + 1;
                 let labels = td::swap_labels(
                     &task,
                     &["noc-proposal:", "noc-reviews:"],

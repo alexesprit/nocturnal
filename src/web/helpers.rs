@@ -8,7 +8,9 @@ use super::models::{
     OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
 };
 use crate::lock::is_process_alive;
-use crate::td::{Task, TaskStatus, Td};
+use crate::td::{
+    Task, TaskStatus, Td, label_has_proposal_ready, label_proposal_id, label_review_count,
+};
 
 // --- Validation allowlists ---
 
@@ -92,9 +94,9 @@ pub(super) fn fetch_project_status(
             _ => {}
         }
 
-        let has_noc_reviews = task.labels.iter().any(|l| l.starts_with("noc-reviews:"));
-        let has_proposal = task.labels.iter().any(|l| l.starts_with("noc-proposal:"));
-        let has_proposal_ready = task.labels.iter().any(|l| l == "noc-proposal-ready");
+        let has_noc_reviews = task.review_count() > 0;
+        let has_proposal = task.proposal_id().is_some();
+        let has_proposal_ready = task.has_proposal_ready();
 
         if has_proposal_ready && task.status != TaskStatus::Closed {
             noc_counts.proposal_ready += 1;
@@ -318,10 +320,7 @@ pub(super) fn derive_noc_state(
     project_path: &FsPath,
     issue_id: &str,
 ) -> Option<NocIssueState> {
-    let review_count = labels.iter().find_map(|l| {
-        l.strip_prefix("noc-reviews:")
-            .and_then(|n| n.parse::<u32>().ok())
-    });
+    let review_count = label_review_count(labels);
 
     let badge;
     let review_cycle;
@@ -350,7 +349,7 @@ pub(super) fn derive_noc_state(
                 _ => return None,
             }
         }
-    } else if labels.iter().any(|l| l == "noc-proposal-ready") {
+    } else if label_has_proposal_ready(labels) {
         if *status == TaskStatus::Closed {
             return None;
         }
@@ -359,7 +358,7 @@ pub(super) fn derive_noc_state(
             text: "proposal ready".to_string(),
             css_class: "proposal-ready".to_string(),
         };
-    } else if labels.iter().any(|l| l.starts_with("noc-proposal:")) {
+    } else if label_proposal_id(labels).is_some() {
         if *status == TaskStatus::Closed {
             return None;
         }
@@ -376,12 +375,8 @@ pub(super) fn derive_noc_state(
     let (worktree_path, worktree_branch) = find_worktree_for_task(project_path, issue_id);
 
     // Build proposal URL if a proposal label exists
-    let (proposal_url, proposal_label) = labels
-        .iter()
-        .find_map(|l| {
-            l.strip_prefix("noc-proposal:")
-                .map(std::string::ToString::to_string)
-        })
+    let (proposal_url, proposal_label) = label_proposal_id(labels)
+        .map(std::string::ToString::to_string)
         .and_then(|id| build_proposal_url(project_path, &id))
         .map_or((None, None), |(url, label)| (Some(url), Some(label)));
 
