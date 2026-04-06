@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} — nocturnal</title>
     <link rel="stylesheet" href="/static/css/styles.css">
-    <script src="https://unpkg.com/htmx.org@2/dist/htmx.min.js"></script>
-    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous" defer></script>
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" integrity="sha384-hJnF5AwidE18GSWTAGHv3ByzzvfNZ1Tcx5y1UUV3WkauuMCEzBJBMSwSt/PUPXnM" crossorigin="anonymous" defer></script>
     <script>
         (function() {
             var t = localStorage.getItem("theme");
@@ -59,7 +59,7 @@
                 }
             }
         });
-        lucide.createIcons();
+        document.addEventListener("DOMContentLoaded", function() { lucide.createIcons(); });
         (function() {
             var modes = ["system", "light", "dark"];
             var labels = { system: "System theme", light: "Light theme", dark: "Dark theme" };
