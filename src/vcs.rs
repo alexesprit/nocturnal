@@ -55,8 +55,9 @@ pub fn create_proposal(
 ) -> Result<Proposal> {
     retry("VCS", || match platform {
         Platform::GitLab => {
-            let output = Command::new("glab")
-                .args([
+            let output = run_vcs_command(
+                "glab",
+                &[
                     "mr",
                     "create",
                     "--title",
@@ -68,15 +69,10 @@ pub fn create_proposal(
                     "--label",
                     "nocturnal",
                     "--yes",
-                ])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to create GitLab MR")?;
-
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                bail!("Failed to create GitLab MR: {}", stderr.trim());
-            }
+                ],
+                wt_path,
+                "Failed to create GitLab MR",
+            )?;
 
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -95,8 +91,9 @@ pub fn create_proposal(
             Ok(Proposal { id, url })
         }
         Platform::GitHub => {
-            let output = Command::new("gh")
-                .args([
+            let output = run_vcs_command(
+                "gh",
+                &[
                     "pr",
                     "create",
                     "--title",
@@ -107,15 +104,10 @@ pub fn create_proposal(
                     target_branch,
                     "--label",
                     "nocturnal",
-                ])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to create GitHub PR")?;
-
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                bail!("Failed to create GitHub PR: {}", stderr.trim());
-            }
+                ],
+                wt_path,
+                "Failed to create GitHub PR",
+            )?;
 
             let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let id = extract_trailing_number(&url)?;
@@ -126,42 +118,30 @@ pub fn create_proposal(
 
 pub fn delete_remote_branch(wt_path: &Path, branch: &str) -> bool {
     retry("VCS", || {
-        let status = Command::new("git")
-            .args(["push", "origin", "--delete", branch])
-            .current_dir(wt_path)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
-        match status {
-            Ok(s) if s.success() => Ok(()),
-            Ok(s) => bail!("git push --delete exited with status {s}"),
-            Err(e) => Err(anyhow::Error::from(e)),
-        }
+        run_vcs_status(
+            "git",
+            &["push", "origin", "--delete", branch],
+            wt_path,
+            "git push --delete",
+        )
     })
     .is_ok()
 }
 
 pub fn enable_auto_merge(platform: Platform, wt_path: &Path, proposal_id: &str) -> bool {
-    retry("VCS", || {
-        let status = match platform {
-            Platform::GitLab => Command::new("glab")
-                .args(["mr", "merge", proposal_id, "--auto", "--yes"])
-                .current_dir(wt_path)
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status(),
-            Platform::GitHub => Command::new("gh")
-                .args(["pr", "merge", proposal_id, "--auto", "--squash"])
-                .current_dir(wt_path)
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status(),
-        };
-        match status {
-            Ok(s) if s.success() => Ok(()),
-            Ok(s) => bail!("auto-merge command exited with status {s}"),
-            Err(e) => Err(anyhow::Error::from(e)),
-        }
+    retry("VCS", || match platform {
+        Platform::GitLab => run_vcs_status(
+            "glab",
+            &["mr", "merge", proposal_id, "--auto", "--yes"],
+            wt_path,
+            "auto-merge command",
+        ),
+        Platform::GitHub => run_vcs_status(
+            "gh",
+            &["pr", "merge", proposal_id, "--auto", "--squash"],
+            wt_path,
+            "auto-merge command",
+        ),
     })
     .is_ok()
 }
@@ -181,29 +161,23 @@ pub fn get_proposal_state(
     retry("VCS", || {
         let state_str = match platform {
             Platform::GitLab => {
-                let output = Command::new("glab")
-                    .args(["mr", "view", proposal_id, "-F", "json"])
-                    .current_dir(wt_path)
-                    .output()
-                    .context("Failed to view GitLab MR")?;
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    bail!("Failed to view GitLab MR #{proposal_id}: {}", stderr.trim());
-                }
+                let output = run_vcs_command(
+                    "glab",
+                    &["mr", "view", proposal_id, "-F", "json"],
+                    wt_path,
+                    &format!("Failed to view GitLab MR #{proposal_id}"),
+                )?;
                 let json: serde_json::Value =
                     serde_json::from_slice(&output.stdout).context("Failed to parse MR JSON")?;
                 json["state"].as_str().unwrap_or("unknown").to_string()
             }
             Platform::GitHub => {
-                let output = Command::new("gh")
-                    .args(["pr", "view", proposal_id, "--json", "state"])
-                    .current_dir(wt_path)
-                    .output()
-                    .context("Failed to view GitHub PR")?;
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    bail!("Failed to view GitHub PR #{proposal_id}: {}", stderr.trim());
-                }
+                let output = run_vcs_command(
+                    "gh",
+                    &["pr", "view", proposal_id, "--json", "state"],
+                    wt_path,
+                    &format!("Failed to view GitHub PR #{proposal_id}"),
+                )?;
                 let json: serde_json::Value =
                     serde_json::from_slice(&output.stdout).context("Failed to parse PR JSON")?;
                 json["state"].as_str().unwrap_or("unknown").to_string()
@@ -226,14 +200,15 @@ pub fn fetch_unresolved_comments(
 ) -> Result<String> {
     retry("VCS", || match platform {
         Platform::GitLab => {
-            let output = Command::new("glab")
-                .args([
+            let output = vcs_exec(
+                "glab",
+                &[
                     "api",
                     &format!("projects/:fullpath/merge_requests/{proposal_id}/discussions"),
-                ])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to fetch GitLab discussions")?;
+                ],
+                wt_path,
+                "Failed to fetch GitLab discussions",
+            )?;
 
             let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
             let comments: Vec<serde_json::Value> = json
@@ -287,8 +262,9 @@ pub fn fetch_unresolved_comments(
   }
 }";
 
-            let output = Command::new("gh")
-                .args([
+            let output = vcs_exec(
+                "gh",
+                &[
                     "api",
                     "graphql",
                     "-f",
@@ -299,10 +275,10 @@ pub fn fetch_unresolved_comments(
                     &format!("repo={repo}"),
                     "-F",
                     &format!("pr={proposal_id}"),
-                ])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to fetch GitHub review threads")?;
+                ],
+                wt_path,
+                "Failed to fetch GitHub review threads",
+            )?;
 
             let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
             let empty = vec![];
@@ -328,14 +304,15 @@ pub fn fetch_unresolved_comments(
                 .collect();
 
             // Also fetch general PR (issue-level) comments
-            let issue_output = Command::new("gh")
-                .args([
+            let issue_output = vcs_exec(
+                "gh",
+                &[
                     "api",
                     &format!("repos/{owner}/{repo}/issues/{proposal_id}/comments"),
-                ])
-                .current_dir(wt_path)
-                .output()
-                .context("Failed to fetch GitHub issue comments")?;
+                ],
+                wt_path,
+                "Failed to fetch GitHub issue comments",
+            )?;
 
             if issue_output.status.success() {
                 if let Ok(serde_json::Value::Array(issue_comments)) =
@@ -442,6 +419,50 @@ pub fn run_pre_merge_hooks(wt_path: &Path, hooks: &[String]) -> Result<()> {
         tracing::info!("Pre-merge hook succeeded: {cmd}");
     }
     Ok(())
+}
+
+/// Run a VCS CLI command and capture its output. Fails if the command exits non-zero.
+fn run_vcs_command(
+    tool: &str,
+    args: &[&str],
+    wt_path: &Path,
+    context: &str,
+) -> Result<std::process::Output> {
+    let output = vcs_exec(tool, args, wt_path, context)?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("{}: {}", context, stderr.trim());
+    }
+    Ok(output)
+}
+
+/// Run a VCS CLI command silently (suppressing stdout/stderr). Fails if the command exits non-zero.
+fn run_vcs_status(tool: &str, args: &[&str], wt_path: &Path, label: &str) -> Result<()> {
+    let status = Command::new(tool)
+        .args(args)
+        .current_dir(wt_path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+    match status {
+        Ok(s) if s.success() => Ok(()),
+        Ok(s) => bail!("{label} exited with status {s}"),
+        Err(e) => Err(anyhow::Error::from(e)),
+    }
+}
+
+/// Run a VCS CLI command and capture its output. Does not check exit status.
+fn vcs_exec(
+    tool: &str,
+    args: &[&str],
+    wt_path: &Path,
+    context: &str,
+) -> Result<std::process::Output> {
+    Command::new(tool)
+        .args(args)
+        .current_dir(wt_path)
+        .output()
+        .with_context(|| context.to_string())
 }
 
 fn gh_owner_repo(wt_path: &Path) -> Result<(String, String)> {
