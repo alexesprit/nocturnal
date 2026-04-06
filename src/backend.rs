@@ -36,6 +36,10 @@ pub struct RunParams<'a> {
 pub trait AiBackend {
     fn build_command(&self, params: &RunParams) -> Result<Command>;
 
+    fn has_budget(&self) -> bool {
+        true
+    }
+
     fn run(&self, params: &RunParams) -> Result<bool> {
         if let Some(dir) = params.log_file.parent() {
             fs::create_dir_all(dir).ok();

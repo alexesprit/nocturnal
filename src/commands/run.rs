@@ -5,7 +5,6 @@ use crate::config::ProjectContext;
 use crate::lock;
 use crate::preflight;
 use crate::td::{NextAction, Td};
-use crate::usage;
 
 /// Returns Ok(true) if work was attempted, Ok(false) if nothing to do.
 pub fn run(ctx: &ProjectContext, task_id: Option<&str>) -> Result<()> {
@@ -77,7 +76,15 @@ pub(crate) fn run_inner(ctx: &ProjectContext, task_id: Option<&str>) -> Result<b
             break;
         }
 
-        if !usage::has_budget() {
+        step = td.get_next_action(false)?; // proposals excluded, see above
+
+        let next_backend = match &step {
+            NextAction::Implement(_) => &ctx.implement_backend,
+            NextAction::Review(_) | NextAction::ProposalReview(_) => &ctx.review_backend,
+            NextAction::Idle => break,
+        };
+
+        if !next_backend.has_budget() {
             info!("Usage budget low, deferring remaining work to next tick");
             td.handoff(
                 &task_id,
@@ -87,8 +94,6 @@ pub(crate) fn run_inner(ctx: &ProjectContext, task_id: Option<&str>) -> Result<b
             .ok();
             break;
         }
-
-        step = td.get_next_action(false)?; // proposals excluded, see above
     }
 
     Ok(true)
