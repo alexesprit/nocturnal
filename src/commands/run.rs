@@ -4,7 +4,7 @@ use tracing::info;
 use crate::config::ProjectContext;
 use crate::lock;
 use crate::preflight;
-use crate::td::{NextAction, Td};
+use crate::td::{NextAction, TaskStatus, Td};
 
 /// Returns Ok(true) if work was attempted, Ok(false) if nothing to do.
 pub fn run(ctx: &ProjectContext, task_id: Option<&str>) -> Result<()> {
@@ -27,7 +27,7 @@ pub(crate) fn run_inner(ctx: &ProjectContext, task_id: Option<&str>) -> Result<b
         let task = td
             .show(id)
             .map_err(|_| anyhow::anyhow!("Task '{id}' not found"))?;
-        if task.status == "in_review" {
+        if task.status == TaskStatus::InReview {
             NextAction::Review(id.to_string())
         } else {
             NextAction::Implement(id.to_string())

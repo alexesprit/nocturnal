@@ -5,6 +5,7 @@ use tracing::{error, info};
 
 use crate::config::ProjectContext;
 use crate::project_config::VcsMode;
+use crate::td::TaskStatus;
 use crate::{backend, git, preflight, prompt, td, vcs};
 
 /// Review a specific task. Returns Ok(true) if review completed successfully
@@ -79,7 +80,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
 
     if task.labels.iter().any(|l| l.starts_with("noc-proposal:")) {
         info!("Task {task_id} already has an open proposal — skipping re-review");
-    } else if task.status == "in_review" {
+    } else if task.status == TaskStatus::InReview {
         // LLM approved the review
         match ctx.settings.vcs_mode {
             VcsMode::Local => handle_approved_local(ctx, &td_client, task_id, &wt_path)?,
@@ -88,7 +89,7 @@ pub fn review_task(ctx: &ProjectContext, task_id: &str) -> Result<bool> {
                 handle_approved_vcs(ctx, &td_client, task_id, &task)?;
             }
         }
-    } else if task.status == "open" {
+    } else if task.status == TaskStatus::Open {
         handle_rejected(ctx, &td_client, task_id, &task)?;
     } else {
         info!(

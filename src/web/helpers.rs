@@ -8,7 +8,7 @@ use super::models::{
     OrchestratorStatus, ProjectStatus, RecentLogEntry, StatusCounts,
 };
 use crate::lock::is_process_alive;
-use crate::td::{Task, Td};
+use crate::td::{Task, TaskStatus, Td};
 
 // --- Validation allowlists ---
 
@@ -84,11 +84,11 @@ pub(super) fn fetch_project_status(
     let mut noc_counts = NocTaskCounts::default();
 
     for task in &tasks {
-        match task.status.as_str() {
-            "open" => counts.open += 1,
-            "in_progress" => counts.in_progress += 1,
-            "blocked" => counts.blocked += 1,
-            "in_review" => counts.in_review += 1,
+        match task.status {
+            TaskStatus::Open => counts.open += 1,
+            TaskStatus::InProgress => counts.in_progress += 1,
+            TaskStatus::Blocked => counts.blocked += 1,
+            TaskStatus::InReview => counts.in_review += 1,
             _ => {}
         }
 
@@ -96,14 +96,14 @@ pub(super) fn fetch_project_status(
         let has_proposal = task.labels.iter().any(|l| l.starts_with("noc-proposal:"));
         let has_proposal_ready = task.labels.iter().any(|l| l == "noc-proposal-ready");
 
-        if has_proposal_ready && task.status != "closed" {
+        if has_proposal_ready && task.status != TaskStatus::Closed {
             noc_counts.proposal_ready += 1;
-        } else if has_proposal && task.status != "closed" {
+        } else if has_proposal && task.status != TaskStatus::Closed {
             noc_counts.proposal_pending += 1;
         } else if has_noc_reviews {
-            match task.status.as_str() {
-                "in_progress" => noc_counts.implementing += 1,
-                "in_review" => noc_counts.reviewing += 1,
+            match task.status {
+                TaskStatus::InProgress => noc_counts.implementing += 1,
+                TaskStatus::InReview => noc_counts.reviewing += 1,
                 _ => {}
             }
         }
@@ -226,7 +226,7 @@ pub(super) fn fetch_next_task(project_path: &FsPath) -> Option<NextTask> {
         action: action_label,
         id: detail.id,
         title: detail.title,
-        priority: detail.priority,
+        priority: detail.priority.to_string(),
     })
 }
 
@@ -313,7 +313,7 @@ pub(super) fn parse_remote_to_https_base(remote: &str) -> Option<String> {
 
 pub(super) fn derive_noc_state(
     labels: &[String],
-    status: &str,
+    status: &TaskStatus,
     max_reviews: u32,
     project_path: &FsPath,
     issue_id: &str,
@@ -335,13 +335,13 @@ pub(super) fn derive_noc_state(
             };
         } else {
             match status {
-                "in_progress" => {
+                TaskStatus::InProgress => {
                     badge = NocBadge {
                         text: "implementing".to_string(),
                         css_class: "implementing".to_string(),
                     };
                 }
-                "in_review" => {
+                TaskStatus::InReview => {
                     badge = NocBadge {
                         text: "noc reviewing".to_string(),
                         css_class: "reviewing".to_string(),
@@ -351,7 +351,7 @@ pub(super) fn derive_noc_state(
             }
         }
     } else if labels.iter().any(|l| l == "noc-proposal-ready") {
-        if status == "closed" {
+        if *status == TaskStatus::Closed {
             return None;
         }
         review_cycle = None;
@@ -360,7 +360,7 @@ pub(super) fn derive_noc_state(
             css_class: "proposal-ready".to_string(),
         };
     } else if labels.iter().any(|l| l.starts_with("noc-proposal:")) {
-        if status == "closed" {
+        if *status == TaskStatus::Closed {
             return None;
         }
         review_cycle = None;
@@ -417,11 +417,11 @@ pub(super) fn group_by_status(issues: Vec<Task>) -> (Vec<Task>, Vec<Task>, Vec<T
     let mut blocked = Vec::new();
     let mut in_review = Vec::new();
     for task in issues {
-        match task.status.as_str() {
-            "open" => open.push(task),
-            "in_progress" => in_progress.push(task),
-            "blocked" => blocked.push(task),
-            "in_review" => in_review.push(task),
+        match task.status {
+            TaskStatus::Open => open.push(task),
+            TaskStatus::InProgress => in_progress.push(task),
+            TaskStatus::Blocked => blocked.push(task),
+            TaskStatus::InReview => in_review.push(task),
             _ => {}
         }
     }

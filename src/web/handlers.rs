@@ -543,7 +543,7 @@ pub async fn update_priority(
     .await;
 
     match status_result {
-        Ok(Ok(ref status)) if status == "closed" => {
+        Ok(Ok(ref status)) if *status == crate::td::TaskStatus::Closed => {
             return (
                 StatusCode::FORBIDDEN,
                 "cannot update priority of a closed task",

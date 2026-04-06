@@ -9,8 +9,7 @@ use crate::config::ProjectContext;
 use crate::git;
 use crate::lock::is_process_alive;
 use crate::td;
-
-const TERMINAL_STATUSES: &[&str] = &["done", "approved", "blocked", "closed"];
+use crate::td::TaskStatus;
 
 pub fn run(ctx: &ProjectContext) -> Result<()> {
     let worktrees_removed = gc_worktrees(ctx)?;
@@ -41,7 +40,12 @@ fn gc_worktrees(ctx: &ProjectContext) -> Result<usize> {
             }
         };
 
-        if !TERMINAL_STATUSES.contains(&status.as_str()) {
+        let is_terminal = matches!(
+            status,
+            TaskStatus::Done | TaskStatus::Blocked | TaskStatus::Closed
+        ) || matches!(&status, TaskStatus::Unknown(s) if s == "approved");
+
+        if !is_terminal {
             info!("gc: keeping worktree for {task_id} (status: {status})");
             continue;
         }

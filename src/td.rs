@@ -1,8 +1,158 @@
+use std::fmt;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Deserializer};
 use tracing::debug;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum TaskStatus {
+    #[default]
+    Open,
+    InProgress,
+    InReview,
+    Blocked,
+    Done,
+    Closed,
+    Unknown(String),
+}
+
+impl<'de> Deserialize<'de> for TaskStatus {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "open" => TaskStatus::Open,
+            "in_progress" => TaskStatus::InProgress,
+            "in_review" => TaskStatus::InReview,
+            "blocked" => TaskStatus::Blocked,
+            "done" => TaskStatus::Done,
+            "closed" => TaskStatus::Closed,
+            _ => TaskStatus::Unknown(s),
+        })
+    }
+}
+
+impl fmt::Display for TaskStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TaskStatus::Open => write!(f, "open"),
+            TaskStatus::InProgress => write!(f, "in_progress"),
+            TaskStatus::InReview => write!(f, "in_review"),
+            TaskStatus::Blocked => write!(f, "blocked"),
+            TaskStatus::Done => write!(f, "done"),
+            TaskStatus::Closed => write!(f, "closed"),
+            TaskStatus::Unknown(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+impl PartialEq<str> for TaskStatus {
+    fn eq(&self, other: &str) -> bool {
+        match (self, other) {
+            (TaskStatus::Open, "open")
+            | (TaskStatus::InProgress, "in_progress")
+            | (TaskStatus::InReview, "in_review")
+            | (TaskStatus::Blocked, "blocked")
+            | (TaskStatus::Done, "done")
+            | (TaskStatus::Closed, "closed") => true,
+            (TaskStatus::Unknown(s), o) => s == o,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<&str> for TaskStatus {
+    fn eq(&self, other: &&str) -> bool {
+        self == *other
+    }
+}
+
+impl PartialEq<TaskStatus> for str {
+    fn eq(&self, other: &TaskStatus) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<TaskStatus> for &str {
+    fn eq(&self, other: &TaskStatus) -> bool {
+        other == *self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskPriority {
+    P0,
+    P1,
+    P2,
+    P3,
+    P4,
+    Unknown(String),
+}
+
+impl<'de> Deserialize<'de> for TaskPriority {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "P0" => TaskPriority::P0,
+            "P1" => TaskPriority::P1,
+            "P2" => TaskPriority::P2,
+            "P3" => TaskPriority::P3,
+            "P4" => TaskPriority::P4,
+            _ => TaskPriority::Unknown(s),
+        })
+    }
+}
+
+impl Default for TaskPriority {
+    fn default() -> Self {
+        TaskPriority::Unknown(String::new())
+    }
+}
+
+impl fmt::Display for TaskPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TaskPriority::P0 => write!(f, "P0"),
+            TaskPriority::P1 => write!(f, "P1"),
+            TaskPriority::P2 => write!(f, "P2"),
+            TaskPriority::P3 => write!(f, "P3"),
+            TaskPriority::P4 => write!(f, "P4"),
+            TaskPriority::Unknown(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+impl PartialEq<str> for TaskPriority {
+    fn eq(&self, other: &str) -> bool {
+        match (self, other) {
+            (TaskPriority::P0, "P0")
+            | (TaskPriority::P1, "P1")
+            | (TaskPriority::P2, "P2")
+            | (TaskPriority::P3, "P3")
+            | (TaskPriority::P4, "P4") => true,
+            (TaskPriority::Unknown(s), o) => s == o,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<&str> for TaskPriority {
+    fn eq(&self, other: &&str) -> bool {
+        self == *other
+    }
+}
+
+impl PartialEq<TaskPriority> for str {
+    fn eq(&self, other: &TaskPriority) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<TaskPriority> for &str {
+    fn eq(&self, other: &TaskPriority) -> bool {
+        other == *self
+    }
+}
 
 /// Validates a task ID against `^[a-zA-Z0-9_-]+$`.
 /// Returns an error for IDs that could cause path traversal or flag injection.
@@ -34,11 +184,11 @@ pub struct Task {
     #[serde(default, deserialize_with = "null_as_default")]
     pub description: String,
     #[serde(default, deserialize_with = "null_as_default")]
-    pub status: String,
+    pub status: TaskStatus,
     #[serde(default, deserialize_with = "null_as_default")]
     pub labels: Vec<String>,
     #[serde(default, deserialize_with = "null_as_default")]
-    pub priority: String,
+    pub priority: TaskPriority,
     #[serde(rename = "type", default, deserialize_with = "null_as_default")]
     pub task_type: String,
     #[serde(default, deserialize_with = "null_as_default")]
@@ -61,9 +211,9 @@ pub struct IssueDetail {
     #[serde(default, deserialize_with = "null_as_default")]
     pub title: String,
     #[serde(default, deserialize_with = "null_as_default")]
-    pub status: String,
+    pub status: TaskStatus,
     #[serde(default, deserialize_with = "null_as_default")]
-    pub priority: String,
+    pub priority: TaskPriority,
     #[serde(rename = "type", default, deserialize_with = "null_as_default")]
     pub issue_type: String,
     #[serde(default, deserialize_with = "null_as_default")]
@@ -618,9 +768,9 @@ mod tests {
             id: "t1".to_string(),
             title: String::new(),
             description: String::new(),
-            status: String::new(),
+            status: TaskStatus::default(),
             labels: labels.iter().map(|s| (*s).to_string()).collect(),
-            priority: String::new(),
+            priority: TaskPriority::default(),
             task_type: String::new(),
             sprint: String::new(),
             created_at: String::new(),
@@ -936,7 +1086,7 @@ esac
         assert_eq!(task.id, "t1");
         assert_eq!(task.title, "");
         assert_eq!(task.description, "");
-        assert_eq!(task.status, "");
+        assert_eq!(task.status, TaskStatus::Open);
         assert!(task.labels.is_empty());
     }
 
