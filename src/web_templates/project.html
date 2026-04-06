@@ -22,6 +22,7 @@
 {% if !recently_closed.is_empty() %}
 <section class="recently-closed">
     <h2>Recently Closed</h2>
+    <div class="table-scroll">
     <table>
         <thead>
             <tr>
@@ -46,6 +47,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </section>
 {% endif %}
 {% endblock %}

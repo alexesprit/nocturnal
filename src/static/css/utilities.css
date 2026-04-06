@@ -98,7 +98,7 @@ main > section:nth-of-type(4) { animation-delay: 0.18s; }
 @media (max-width: 768px) {
   html { font-size: 14px; }
   main { padding: 1rem; }
-  header > nav { padding: 0.7rem 1rem; }
+  .header-inner { padding: 0.7rem 1rem; }
 
   .project-grid {
     grid-template-columns: 1fr;
@@ -121,12 +121,14 @@ main > section:nth-of-type(4) { animation-delay: 0.18s; }
     grid-template-columns: 100px 1fr;
   }
 
-  table {
-    display: block;
+  .table-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    font-size: 0.8rem;
     border-radius: var(--radius-md);
+  }
+
+  table {
+    font-size: 0.8rem;
   }
 
   th, td {

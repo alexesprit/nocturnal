@@ -22,16 +22,21 @@
 <body>
     <a href="#main-content" class="sr-only">Skip to main content</a>
     <header>
-        <nav aria-label="Breadcrumb">
-            <a href="/">nocturnal</a>
-            {% for crumb in breadcrumbs %}
-            <span class="separator">/</span>
-            {% if let Some(url) = crumb.url %}
-            <a href="{{ url }}">{{ crumb.label }}</a>
-            {% else %}
-            <span>{{ crumb.label }}</span>
-            {% endif %}
-            {% endfor %}
+        <div class="header-inner">
+            <nav aria-label="Breadcrumb">
+                <ol>
+                    <li><a href="/">nocturnal</a></li>
+                    {% for crumb in breadcrumbs %}
+                    <li>
+                        {% if let Some(url) = crumb.url %}
+                        <a href="{{ url }}">{{ crumb.label }}</a>
+                        {% else %}
+                        <span aria-current="page">{{ crumb.label }}</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ol>
+            </nav>
             <div class="header-actions">
                 {% block header_actions %}{% endblock %}
             </div>
@@ -40,7 +45,7 @@
                 <i data-lucide="moon" id="theme-icon-moon"></i>
                 <i data-lucide="monitor" id="theme-icon-system"></i>
             </button>
-        </nav>
+        </div>
     </header>
     <main id="main-content">
         {% block content %}{% endblock %}

@@ -4,7 +4,7 @@
 /* ============================================
    Layout: Header — frosted glass
    ============================================ */
-header > nav {
+.header-inner {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -14,7 +14,34 @@ header > nav {
   font-size: 0.85rem;
 }
 
-header > nav > a:first-child {
+.header-inner > nav {
+  flex: 1;
+  min-width: 0;
+}
+
+.header-inner > nav ol {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.header-inner > nav ol > li {
+  display: flex;
+  align-items: center;
+}
+
+.header-inner > nav ol > li + li::before {
+  content: '/';
+  color: var(--text-tertiary);
+  font-weight: 400;
+  opacity: 0.5;
+  margin: 0 0.35rem;
+}
+
+.header-inner > nav ol > li:first-child > a {
   font-family: var(--font-display);
   font-weight: 700;
   color: var(--text-primary);
@@ -22,7 +49,7 @@ header > nav > a:first-child {
   font-size: 0.95rem;
 }
 
-header > nav > a:first-child::before {
+.header-inner > nav ol > li:first-child > a::before {
   content: '';
   display: inline-block;
   width: 8px;
@@ -34,22 +61,16 @@ header > nav > a:first-child::before {
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
-header > nav > a {
+.header-inner > nav ol > li > a {
   color: var(--text-secondary);
   transition: color 0.2s var(--ease-smooth);
 }
 
-header > nav > a:hover {
+.header-inner > nav ol > li > a:hover {
   color: var(--accent);
 }
 
-header > nav > .separator {
-  color: var(--text-tertiary);
-  font-weight: 400;
-  opacity: 0.5;
-}
-
-header > nav > span:last-child {
+.header-inner > nav ol > li:last-child > span {
   color: var(--text-primary);
   font-weight: 500;
 }

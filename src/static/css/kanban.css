@@ -71,6 +71,11 @@
   border-color: var(--border-strong);
 }
 
+.kanban-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .kanban-card-id {
   margin-bottom: 0.3rem;
 }

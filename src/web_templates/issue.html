@@ -23,6 +23,7 @@
         {% else %}
         <span class="priority-select-wrapper badge badge-priority badge-priority-{{ issue.priority }}" id="priority-select-{{ issue.id }}">
             <select class="priority-select"
+                aria-label="Change priority"
                 hx-post="/api/projects/{{ project_name }}/issues/{{ issue.id }}/priority"
                 hx-trigger="change"
                 hx-target="#priority-select-{{ issue.id }}"
@@ -176,6 +177,7 @@
 {% if !issue.activity.is_empty() %}
 <section>
     <h2>Activity</h2>
+    <div class="table-scroll">
     <table>
         <thead>
             <tr>
@@ -194,11 +196,13 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </section>
 {% endif %}
 {% if !files.is_empty() %}
 <section>
     <h2>Linked Files</h2>
+    <div class="table-scroll">
     <table>
         <thead>
             <tr>
@@ -217,6 +221,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </section>
 {% endif %}
 <script>

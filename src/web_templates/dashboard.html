@@ -27,7 +27,7 @@
 {% else %}
 <div class="project-grid">
     {% for project in projects %}
-    <article data-href="/projects/{{ project.name }}">
+    <article data-href="/projects/{{ project.name }}" tabindex="0" role="link">
         <header>
             <h3>
                 {{ project.name }}
@@ -90,6 +90,7 @@
 {% if !orchestrator.recent_logs.is_empty() %}
 <section class="recent-activity">
     <h2>Recent Activity</h2>
+    <div class="table-scroll">
     <table class="recent-logs-table">
         <thead>
             <tr>
@@ -112,6 +113,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </section>
 {% endif %}
 {% endblock %}
