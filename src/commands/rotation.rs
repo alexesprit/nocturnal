@@ -57,7 +57,7 @@ pub fn rotate_projects(
             continue;
         }
 
-        let settings = load_project_settings(&project_root);
+        let settings = load_project_settings(&project_root)?;
         if !settings.auto_develop {
             info!(
                 "Skipping {} — auto_develop is false",
@@ -81,7 +81,7 @@ pub fn rotate_projects(
             continue;
         };
 
-        let ctx = ProjectContext::new(cfg.clone(), project_root.clone());
+        let ctx = ProjectContext::new(cfg.clone(), project_root.clone())?;
 
         if cfg.dry_run {
             info!("dry-run: would process project {}", project_root.display());

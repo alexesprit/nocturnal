@@ -215,7 +215,7 @@ pub(super) fn fetch_orchestrator_status(
 
 pub(super) fn fetch_next_task(project_path: &FsPath) -> Option<NextTask> {
     let td = Td::new(project_path);
-    let vcs_mode = crate::project_config::load_vcs_mode(project_path);
+    let vcs_mode = crate::project_config::load_vcs_mode(project_path).unwrap_or_default();
     let check_proposals = crate::vcs::detect_platform(project_path, vcs_mode).is_some();
     let action = td.get_next_action(check_proposals).ok()?;
 

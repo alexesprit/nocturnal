@@ -1,6 +1,7 @@
 use std::io;
 use std::path::Path;
 
+use anyhow::{Result, bail};
 use serde::Deserialize;
 
 pub const DEFAULT_MAX_REVIEWS: u32 = 3;
@@ -145,15 +146,12 @@ fn resolve_merge_strategy(vcs: &VcsConfig) -> MergeStrategy {
         })
 }
 
-pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
+pub fn load_project_settings(project_root: &Path) -> Result<ProjectSettings> {
     let path = project_root.join(".nocturnal.toml");
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return ProjectSettings::default(),
-        Err(e) => {
-            tracing::warn!("Failed to read {}: {e}", path.display());
-            return ProjectSettings::default();
-        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(ProjectSettings::default()),
+        Err(e) => bail!("Failed to read {}: {e}", path.display()),
     };
     match toml::from_str::<ProjectConfig>(&content) {
         Ok(f) => {
@@ -195,7 +193,7 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                     }
                 })
                 .unwrap_or_else(|| DEFAULT_TARGET_BRANCH.to_string());
-            ProjectSettings {
+            Ok(ProjectSettings {
                 vcs_mode: vcs.mode.unwrap_or_default(),
                 auto_merge: vcs.auto_merge.unwrap_or(true),
                 delete_branch_on_merge: vcs.delete_branch_on_merge.unwrap_or(false),
@@ -224,12 +222,9 @@ pub fn load_project_settings(project_root: &Path) -> ProjectSettings {
                 codex_reasoning_effort,
                 pre_merge_hooks: hooks.pre_merge.unwrap_or_default(),
                 post_merge_hooks: hooks.post_merge.unwrap_or_default(),
-            }
+            })
         }
-        Err(e) => {
-            tracing::warn!("Failed to parse {}: {e}", path.display());
-            ProjectSettings::default()
-        }
+        Err(e) => bail!("Failed to parse {}: {e}", path.display()),
     }
 }
 
@@ -277,8 +272,8 @@ fn validate_branch_name(name: &str) -> bool {
 }
 
 /// Convenience wrapper kept for callers that only need vcs mode.
-pub fn load_vcs_mode(project_root: &Path) -> VcsMode {
-    load_project_settings(project_root).vcs_mode
+pub fn load_vcs_mode(project_root: &Path) -> Result<VcsMode> {
+    Ok(load_project_settings(project_root)?.vcs_mode)
 }
 
 #[cfg(test)]
@@ -315,7 +310,10 @@ mod tests {
 
     #[test]
     fn load_from_nonexistent_dir() {
-        assert_eq!(load_vcs_mode(Path::new("/nonexistent/path")), VcsMode::Off);
+        assert_eq!(
+            load_vcs_mode(Path::new("/nonexistent/path")).unwrap(),
+            VcsMode::Off
+        );
     }
 
     #[test]
@@ -334,7 +332,7 @@ mod tests {
 
     #[test]
     fn auto_merge_defaults_to_true() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert!(settings.auto_merge);
     }
 
@@ -364,7 +362,7 @@ mod tests {
 
     #[test]
     fn delete_branch_on_merge_defaults_to_false() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert!(!settings.delete_branch_on_merge);
     }
 
@@ -393,7 +391,7 @@ mod tests {
 
     #[test]
     fn defaults_when_fields_missing() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert_eq!(settings.max_reviews, DEFAULT_MAX_REVIEWS);
         assert_eq!(settings.max_budget, DEFAULT_MAX_BUDGET);
         assert_eq!(settings.implement_model, DEFAULT_MODEL);
@@ -455,7 +453,7 @@ mod tests {
 
     #[test]
     fn no_claude_section_uses_default_model() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert_eq!(settings.implement_model, DEFAULT_MODEL);
         assert_eq!(settings.review_model, DEFAULT_MODEL);
     }
@@ -482,7 +480,7 @@ mod tests {
 
     #[test]
     fn merge_strategy_defaults_to_ff() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert_eq!(settings.merge_strategy, MergeStrategy::Ff);
     }
 
@@ -504,7 +502,7 @@ mod tests {
 
     #[test]
     fn target_branch_defaults_to_main() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert_eq!(settings.target_branch, "main");
     }
 
@@ -554,7 +552,7 @@ mod tests {
 
     #[test]
     fn post_merge_hooks_default_to_empty() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert!(settings.post_merge_hooks.is_empty());
     }
 
@@ -582,7 +580,7 @@ mod tests {
 
     #[test]
     fn pre_merge_hooks_default_to_empty() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert!(settings.pre_merge_hooks.is_empty());
     }
 
@@ -598,7 +596,7 @@ mod tests {
 
     #[test]
     fn auto_develop_defaults_to_true() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert!(settings.auto_develop);
     }
 
@@ -615,7 +613,7 @@ mod tests {
         let toml_path = dir.path().join(".nocturnal.toml");
         let mut f = std::fs::File::create(&toml_path).unwrap();
         write!(f, "auto_develop = false\n").unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert!(!settings.auto_develop);
     }
 
@@ -637,7 +635,7 @@ mod tests {
             )
         )
         .unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert_eq!(settings.implement_provider, Provider::Codex);
         assert_eq!(settings.review_provider, Provider::Claude);
         assert_eq!(settings.implement_model, "o4-mini");
@@ -660,7 +658,7 @@ mod tests {
             )
         )
         .unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert_eq!(settings.implement_provider, Provider::Codex);
         assert_eq!(settings.review_provider, Provider::Claude);
         assert_eq!(settings.implement_model, "o3");
@@ -674,7 +672,7 @@ mod tests {
         let toml_path = dir.path().join(".nocturnal.toml");
         let mut f = std::fs::File::create(&toml_path).unwrap();
         write!(f, "provider = \"codex\"\n[codex]\nmodel = \"o3\"\n").unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert_eq!(settings.implement_provider, Provider::Codex);
         assert_eq!(settings.review_provider, Provider::Codex);
         assert_eq!(settings.implement_model, "o3");
@@ -697,7 +695,7 @@ mod tests {
             )
         )
         .unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert_eq!(settings.implement_provider, Provider::Claude);
         assert_eq!(settings.review_provider, Provider::Claude);
         assert_eq!(settings.implement_model, "opus");
@@ -706,7 +704,7 @@ mod tests {
 
     #[test]
     fn per_action_providers_default_to_claude() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert_eq!(settings.implement_provider, Provider::Claude);
         assert_eq!(settings.review_provider, Provider::Claude);
     }
@@ -777,7 +775,7 @@ mod tests {
 
     #[test]
     fn max_runtime_secs_defaults_to_1800() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert_eq!(settings.max_runtime_secs, DEFAULT_MAX_RUNTIME_SECS);
     }
 
@@ -788,7 +786,7 @@ mod tests {
         let toml_path = dir.path().join(".nocturnal.toml");
         let mut f = std::fs::File::create(&toml_path).unwrap();
         write!(f, "max_runtime_secs = 900\n").unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert_eq!(settings.max_runtime_secs, 900);
     }
 
@@ -844,7 +842,7 @@ mod tests {
             "provider = \"codex\"\n[codex]\nmodel = \"o3\"\nimplement_model = \"o4-mini\"\n"
         )
         .unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert_eq!(settings.provider, Provider::Codex);
         assert_eq!(settings.implement_model, "o4-mini");
         assert_eq!(settings.review_model, "o3");
@@ -861,7 +859,7 @@ mod tests {
             "provider = \"claude\"\n[claude]\nmodel = \"opus\"\nreview_model = \"haiku\"\n"
         )
         .unwrap();
-        let settings = load_project_settings(dir.path());
+        let settings = load_project_settings(dir.path()).unwrap();
         assert_eq!(settings.provider, Provider::Claude);
         assert_eq!(settings.implement_model, "opus");
         assert_eq!(settings.review_model, "haiku");
@@ -869,8 +867,20 @@ mod tests {
 
     #[test]
     fn load_settings_missing_provider_defaults_to_claude() {
-        let settings = load_project_settings(Path::new("/nonexistent/path"));
+        let settings = load_project_settings(Path::new("/nonexistent/path")).unwrap();
         assert_eq!(settings.provider, Provider::Claude);
+    }
+
+    #[test]
+    fn malformed_toml_returns_err() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".nocturnal.toml");
+        let mut f = std::fs::File::create(&toml_path).unwrap();
+        // max_reviews expects u32, giving a string causes a deserialization error
+        write!(f, "max_reviews = \"not-a-number\"\n").unwrap();
+        let result = load_project_settings(dir.path());
+        assert!(result.is_err(), "expected Err for malformed TOML, got Ok");
     }
 
     #[test]

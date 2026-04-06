@@ -13,17 +13,17 @@ pub fn run(cfg: &Config, addr: &str, port: u16) -> Result<()> {
     let projects: Vec<ProjectEntry> = cfg
         .projects_list()
         .into_iter()
-        .map(|path_str| {
+        .map(|path_str| -> anyhow::Result<ProjectEntry> {
             let path = PathBuf::from(&path_str);
             let name = config::project_slug(&path);
-            let settings = project_config::load_project_settings(&path);
-            ProjectEntry {
+            let settings = project_config::load_project_settings(&path)?;
+            Ok(ProjectEntry {
                 name,
                 path,
                 max_reviews: settings.max_reviews,
-            }
+            })
         })
-        .collect();
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
     if projects.is_empty() {
         anyhow::bail!("no projects configured (set NOCTURNAL_PROJECTS or projects file)");

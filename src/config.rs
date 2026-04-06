@@ -26,8 +26,8 @@ pub struct ProjectContext {
 }
 
 impl ProjectContext {
-    pub fn new(cfg: Config, project_root: PathBuf) -> Self {
-        let settings = project_config::load_project_settings(&project_root);
+    pub fn new(cfg: Config, project_root: PathBuf) -> anyhow::Result<Self> {
+        let settings = project_config::load_project_settings(&project_root)?;
         let make_backend = |provider: Provider| -> Arc<dyn AiBackend> {
             match provider {
                 Provider::Claude => Arc::new(ClaudeBackend {
@@ -45,13 +45,13 @@ impl ProjectContext {
         } else {
             make_backend(settings.review_provider)
         };
-        Self {
+        Ok(Self {
             cfg,
             project_root,
             settings,
             implement_backend,
             review_backend,
-        }
+        })
     }
 
     pub fn project_slug(&self) -> String {

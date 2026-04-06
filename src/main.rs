@@ -164,7 +164,7 @@ fn run(cli: Cli) -> Result<()> {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
                 info!("Project: {}", root.display());
-                let ctx = config::ProjectContext::new(cfg, root);
+                let ctx = config::ProjectContext::new(cfg, root)?;
                 commands::run::run(&ctx, task.as_deref())
             }
         }
@@ -179,7 +179,7 @@ fn run(cli: Cli) -> Result<()> {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
                 info!("Project: {}", root.display());
-                let ctx = config::ProjectContext::new(cfg, root);
+                let ctx = config::ProjectContext::new(cfg, root)?;
                 commands::proposal_review::run(&ctx)
             }
         }
@@ -198,7 +198,7 @@ fn run(cli: Cli) -> Result<()> {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
                 info!("Project: {}", root.display());
-                let ctx = config::ProjectContext::new(cfg, root);
+                let ctx = config::ProjectContext::new(cfg, root)?;
                 commands::loop_cmd::run_single(&ctx, max_iterations)
             }
         }
@@ -211,7 +211,7 @@ fn run(cli: Cli) -> Result<()> {
                 use std::path::PathBuf;
                 use tracing::warn;
                 // Run lock cleanup once before the project loop
-                let lock_ctx = config::ProjectContext::new(cfg.clone(), default_root.clone());
+                let lock_ctx = config::ProjectContext::new(cfg.clone(), default_root.clone())?;
                 let locks_removed = commands::gc::run_locks_only(&lock_ctx)?;
                 let mut total_worktrees = 0usize;
                 let mut project_count = 0usize;
@@ -221,7 +221,7 @@ fn run(cli: Cli) -> Result<()> {
                         warn!("gc: skipping {project} (no .todos/ found)");
                         continue;
                     }
-                    let ctx = config::ProjectContext::new(cfg.clone(), root);
+                    let ctx = config::ProjectContext::new(cfg.clone(), root)?;
                     let removed = commands::gc::run_worktrees_only(&ctx)?;
                     println!("gc [{project}]: {removed} worktree(s) removed");
                     total_worktrees += removed;
@@ -235,7 +235,7 @@ fn run(cli: Cli) -> Result<()> {
                 let root = path.map(std::path::PathBuf::from).unwrap_or(default_root);
                 config::check_td_init(&root)?;
                 info!("Project: {}", root.display());
-                let ctx = config::ProjectContext::new(cfg, root);
+                let ctx = config::ProjectContext::new(cfg, root)?;
                 commands::gc::run(&ctx)
             }
         }
